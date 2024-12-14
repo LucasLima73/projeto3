@@ -1,0 +1,76 @@
+/* Estilo geral */
+body {
+    font-family: 'Arial', sans-serif;
+    background-color: #ffffff;
+    color: #555555; /* Texto cinza */
+    margin: 0;
+    padding: 0;
+  }
+  
+  /* Container principal */
+  .xml-container {
+    max-width: 600px;
+    margin: 50px auto;
+    padding: 20px;
+    background-color: #f9f9f9;
+    border-radius: 10px;
+    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
+  }
+  
+  /* Cabeçalho */
+  .xml-container h1 {
+    text-align: center;
+    color: #333333; /* Um cinza mais escuro para o título */
+    margin-bottom: 20px;
+  }
+  
+  /* Botões */
+  .xml-container button {
+    background-color: #007bff;
+    color: white;
+    border: none;
+    border-radius: 5px;
+    padding: 10px 15px;
+    font-size: 14px;
+    cursor: pointer;
+    margin: 10px 0;
+    transition: background-color 0.3s ease;
+  }
+  
+  .xml-container button:hover {
+    background-color: #0056b3;
+  }
+  
+  .xml-container button:active {
+    background-color: #003f7f;
+  }
+  
+  /* Parágrafos */
+  .xml-container p {
+    font-size: 14px;
+    margin: 10px 0;
+    color: #555555;
+  }
+  
+  /* Divisores */
+  .xml-container > div {
+    margin-bottom: 20px;
+    text-align: center;
+  }
+  
+  /* Responsivo */
+  @media (max-width: 600px) {
+    .xml-container {
+      padding: 15px;
+    }
+  
+    .xml-container button {
+      font-size: 12px;
+      padding: 8px 12px;
+    }
+  
+    .xml-container p {
+      font-size: 12px;
+    }
+  }
+  
