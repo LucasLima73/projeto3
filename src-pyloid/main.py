@@ -5,7 +5,7 @@ import xml.etree.ElementTree as ET
 import json
 
 # Configuração do Pyloid
-app = Pyloid(app_name="Pyloid-App", single_instance=True)
+app = Pyloid(app_name="Projeto", single_instance=True)
 
 if is_production():
     app.set_icon(os.path.join(get_production_path(), "icons/icon.png"))
@@ -436,19 +436,31 @@ class SpreadsheetProcessingAPI(PyloidAPI):
             print(f"Erro ao abrir o diálogo de salvamento: {e}")
             return f"Erro ao abrir o diálogo de salvamento: {e}"
 
+    @Bridge(result=str)
+    def open_window(self, params: dict):
+        title = params.get("title", "Nova Janela")
+        width = params.get("width", 600)
+        height = params.get("height", 400)
+        url = params.get("url", "http://localhost:3000")
+
+        window = app.create_window(title=title, width=width, height=height)
+        window.load_url(url)
+        window.show_and_focus()
+
+        return "Nova janela aberta com sucesso"
 
 
 # Configuração Principal do Pyloid
 try:
     if is_production():
         window = app.create_window(
-            title="Pyloid Browser-production",
+            title="Projeto",
             js_apis=[CustomAPI(), XMLProcessingAPI(), SpreadsheetProcessingAPI()],
         )
         window.load_file(os.path.join(get_production_path(), "build/index.html"))
     else:
         window = app.create_window(
-            title="Pyloid Browser-dev",
+            title="Projeto",
             js_apis=[CustomAPI(), XMLProcessingAPI(), SpreadsheetProcessingAPI()],
             dev_tools=True,
         )

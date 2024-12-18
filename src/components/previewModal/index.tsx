@@ -22,30 +22,32 @@ const PreviewModal: React.FC<PreviewModalProps> = ({
   const externalWindow = useRef<Window | null>(null);
   const containerEl = useRef<HTMLDivElement | null>(null);
 
-  const toggleColumn = (column: string) => {
+  // Alternar colunas
+  const toggleColumn = React.useCallback((column: string) => {
     setExcludedColumns(
       excludedColumns.includes(column)
         ? excludedColumns.filter((col) => col !== column)
         : [...excludedColumns, column]
     );
-  };
+  }, [excludedColumns, setExcludedColumns]);
 
-  const handleSave = async () => {
-    try {
-      const response =
-        await window.pyloid.XMLProcessingAPI.save_excluded_columns(
-          JSON.stringify(excludedColumns)
-        );
-      console.log("Colunas excluídas salvas no backend:", response);
-    } catch (error) {
-      console.error("Erro ao salvar colunas excluídas no backend:", error);
+  // Fechar janela modal
+  const closeWindow = React.useCallback(() => {
+    if (externalWindow.current) {
+      externalWindow.current.close();
+      externalWindow.current = null;
+      onClose();
     }
+  }, [onClose]);
+
+  // Salvar colunas e fechar o modal
+  const handleSave = React.useCallback(() => {
     onSave(excludedColumns);
-    externalWindow.current?.close();
-  };
+    closeWindow();
+  }, [excludedColumns, onSave, closeWindow]);
 
   useEffect(() => {
-    // Abre a nova janela
+    // Abrir nova janela
     externalWindow.current = window.open(
       "",
       "_blank",
@@ -57,10 +59,7 @@ const PreviewModal: React.FC<PreviewModalProps> = ({
       containerEl.current = container;
       externalWindow.current.document.body.appendChild(container);
 
-      const title = externalWindow.current.document.createElement("title");
-      title.innerText = "Pré-visualização dos Dados";
-      externalWindow.current.document.head.appendChild(title);
-
+      // Adicionar estilo Bootstrap
       const style = externalWindow.current.document.createElement("link");
       style.rel = "stylesheet";
       style.href =
@@ -69,43 +68,41 @@ const PreviewModal: React.FC<PreviewModalProps> = ({
 
       const root = ReactDOM.createRoot(container);
       root.render(
-        <Modal show onHide={() => externalWindow.current?.close()} centered>
+        <Modal show onHide={closeWindow} centered>
           <Modal.Header closeButton>
             <Modal.Title>Pré-visualização dos Dados</Modal.Title>
           </Modal.Header>
           <Modal.Body>
-            <Table striped bordered hover>
-              <thead>
-                <tr>
-                  {columns.map((col) => (
-                    <th key={col}>
-                      <Form.Check
-                        type="checkbox"
-                        id={`checkbox-${col}`}
-                        label={col}
-                        checked={!excludedColumns.includes(col)}
-                        onChange={() => toggleColumn(col)}
-                      />
-                    </th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {data.slice(0, 5).map((row, index) => (
-                  <tr key={index}>
+            <div style={{ overflowX: "auto" }}>
+              <Table striped bordered hover responsive>
+                <thead>
+                  <tr>
                     {columns.map((col) => (
-                      <td key={col}>{row[col]}</td>
+                      <th key={col}>
+                        <Form.Check
+                          type="checkbox"
+                          label={col}
+                          checked={!excludedColumns.includes(col)}
+                          onChange={() => toggleColumn(col)}
+                        />
+                      </th>
                     ))}
                   </tr>
-                ))}
-              </tbody>
-            </Table>
+                </thead>
+                <tbody>
+                  {data.slice(0, 5).map((row, index) => (
+                    <tr key={index}>
+                      {columns.map((col) => (
+                        <td key={col}>{row[col]}</td>
+                      ))}
+                    </tr>
+                  ))}
+                </tbody>
+              </Table>
+            </div>
           </Modal.Body>
           <Modal.Footer>
-            <Button
-              variant="secondary"
-              onClick={() => externalWindow.current?.close()}
-            >
+            <Button variant="secondary" onClick={closeWindow}>
               Cancelar
             </Button>
             <Button variant="primary" onClick={handleSave}>
@@ -115,13 +112,11 @@ const PreviewModal: React.FC<PreviewModalProps> = ({
         </Modal>
       );
 
-      externalWindow.current.onbeforeunload = () => onClose();
+      externalWindow.current.onbeforeunload = closeWindow;
     }
 
-    return () => {
-      externalWindow.current?.close();
-    };
-  }, []);
+    return () => closeWindow();
+  }, [data, columns, excludedColumns, closeWindow, handleSave, toggleColumn]);
 
   return null;
 };

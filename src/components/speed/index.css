@@ -1,0 +1,36 @@
+.speed-container {
+    padding-top: 20px;
+  }
+  
+  .card {
+    border-radius: 8px;
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+  }
+  
+  .card-title {
+    font-size: 1.5rem;
+    color: #343a40;
+  }
+  
+  button {
+    font-size: 1rem;
+  }
+  
+  .alert {
+    text-align: center;
+    font-size: 1rem;
+  }
+  
+  .form-label {
+    font-weight: bold;
+  }
+  
+  .form-control {
+    border-radius: 8px;
+    font-size: 1rem;
+  }
+  
+  .d-grid button {
+    font-size: 1.2rem;
+  }
+  
