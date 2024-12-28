@@ -1,9 +1,18 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Modal, Button } from "react-bootstrap";
 import "./index.css";
 
 const Home = () => {
   const [show, setShow] = useState(false);
+  const [licenseExpirationDate, setLicenseExpirationDate] = useState("");
+
+  useEffect(() => {
+    // Recupera a data de expiração do localStorage
+    const expirationDate = localStorage.getItem("licenseExpirationDate");
+    if (expirationDate) {
+      setLicenseExpirationDate(formatDate(expirationDate));
+    }
+  }, []);
 
   const handleClose = () => setShow(false);
   const handleShow = () => setShow(true);
@@ -16,6 +25,16 @@ const Home = () => {
       height: 400,
       url: "http://localhost:3000", // Substitua pelo URL da rota que contém o modal
     });
+  };
+
+  // Função para formatar a data no formato DD-MM-AAAA
+  const formatDate = (dateString: string) => {
+    try {
+      const [year, month, day] = dateString.split("-");
+      return `${day}-${month}-${year}`;
+    } catch {
+      return "Data inválida"; // Mensagem padrão em caso de erro
+    }
   };
 
   return (
@@ -53,6 +72,13 @@ const Home = () => {
           </Button>
         </Modal.Footer>
       </Modal>
+
+      {/* Rodapé */}
+      <footer className="footer">
+        <p className="footer-text">
+          Data de Expiração da Licença: {licenseExpirationDate || "Não disponível"}
+        </p>
+      </footer>
     </div>
   );
 };

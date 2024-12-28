@@ -466,6 +466,7 @@ try:
         )
         window.load_url("http://localhost:5173")
     window.show_and_focus()
+    window.set_dev_tools(True)
 except Exception as e:
     print(f"Erro ao inicializar a janela principal: {e}")
 
