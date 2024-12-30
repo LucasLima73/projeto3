@@ -30,8 +30,10 @@ export interface LicenseData {
       const formattedDate = `${expirationDate.slice(0, 4)}-${expirationDate.slice(4, 6)}-${expirationDate.slice(6, 8)}`;
   
       return { id, expirationDate: formattedDate };
+      throw new Error('FODA 2.');
     } catch (error) {
       console.error(error);
+      throw new Error('FODA.');
       return null; // Retorna null em caso de erro
     }
   }

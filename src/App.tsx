@@ -1,114 +1,138 @@
-import { useState, useEffect } from "react";
-import { HashRouter as Router, Routes, Route, NavLink } from "react-router-dom";
-import { Container, Nav } from "react-bootstrap";
+import React, { useEffect } from "react";
 import {
-  FaHome,
-  FaFileExcel,
-  FaFileAlt,
-  FaTachometerAlt,
-} from "react-icons/fa";
-import "./App.css";
+  BrowserRouter as Router,
+  Route,
+  Routes,
+  Navigate,
+  useNavigate,
+  NavLink,
+} from "react-router-dom";
+import { LicenseProvider } from "./LicenseContext";
+import { useLicense } from "./useLicense";
 import Home from "./components/home";
 import Xls from "./components/xls";
 import Xml from "./components/xml";
 import Speed from "./components/speed";
 import License from "./components/license";
+import "./App.css";
 
-const App = () => {
-  const [isLicenseValid, setIsLicenseValid] = useState<boolean | null>(null);
+const ProtectedRoute: React.FC<{ children: JSX.Element }> = ({ children }) => {
+  const { hasValidLicense } = useLicense();
+  return hasValidLicense ? children : <Navigate to="/license" replace />;
+};
+
+const AppContent = () => {
+  const { hasValidLicense } = useLicense();
+  const navigate = useNavigate();
 
   useEffect(() => {
-    // Recuperar a data de expiração da licença do localStorage
-    const expirationDate = localStorage.getItem("licenseExpirationDate");
-
-    if (expirationDate) {
-      const today = new Date();
-      const expiration = new Date(expirationDate);
-
-      // Verificar se a licença está válida
-      if (expiration >= today) {
-        setIsLicenseValid(true); // Licença válida
-      } else {
-        setIsLicenseValid(false); // Licença expirada
-      }
-    } else {
-      setIsLicenseValid(false); // Licença não existe
+    if (!hasValidLicense) {
+      navigate("/license", { replace: true }); // Redireciona para a página de licença
     }
-  }, []);
+  }, [hasValidLicense, navigate]);
 
-  // Renderizar somente a tela de licença enquanto validação não é concluída
-  if (isLicenseValid === null) {
-    return <div>Carregando...</div>; // Exibir carregamento enquanto verifica a licença
-  }
-
-  // Renderizar a tela de licença diretamente se a licença for inválida
-  if (!isLicenseValid) {
-    return (
-      <Router>
-        <License />
-      </Router>
-    );
-  }
-
-  // Renderizar o app normalmente se a licença for válida
   return (
-    <Router>
-      <div className="main-layout">
-        {/* Barra Lateral */}
+    <div className="main-layout">
+      {/* Sidebar visível apenas se a licença for válida */}
+      {hasValidLicense && (
         <div className="sidebar">
           <h2 className="sidebar-title">Menu</h2>
-          <Nav className="flex-column">
+          <nav>
             <NavLink
               to="/"
               className={({ isActive }) =>
                 `sidebar-link ${isActive ? "active" : ""}`
               }
+              className={({ isActive }) =>
+                `sidebar-link ${isActive ? "active" : ""}`
+              }
             >
-              <FaHome className="nav-icon" />
-              <span>Home</span>
+              Home
             </NavLink>
             <NavLink
               to="/xls"
               className={({ isActive }) =>
                 `sidebar-link ${isActive ? "active" : ""}`
               }
+              className={({ isActive }) =>
+                `sidebar-link ${isActive ? "active" : ""}`
+              }
             >
-              <FaFileExcel className="nav-icon" />
-              <span>XLS</span>
+              XLS
             </NavLink>
             <NavLink
               to="/xml"
               className={({ isActive }) =>
                 `sidebar-link ${isActive ? "active" : ""}`
               }
+              className={({ isActive }) =>
+                `sidebar-link ${isActive ? "active" : ""}`
+              }
             >
-              <FaFileAlt className="nav-icon" />
-              <span>XML</span>
+              XML
             </NavLink>
             <NavLink
               to="/speed"
               className={({ isActive }) =>
                 `sidebar-link ${isActive ? "active" : ""}`
               }
+              className={({ isActive }) =>
+                `sidebar-link ${isActive ? "active" : ""}`
+              }
             >
-              <FaTachometerAlt className="nav-icon" />
-              <span>TXT</span>
+              TXT
             </NavLink>
-          </Nav>
+          </nav>
         </div>
-        {/* Conteúdo Principal */}
-        <div className="content">
-          <Container>
-            <Routes>
-              <Route path="/" element={<Home />} />
-              <Route path="/speed" element={<Speed />} />
-              <Route path="/xml" element={<Xml />} />
-              <Route path="/xls" element={<Xls />} />
-            </Routes>
-          </Container>
-        </div>
+      )}
+      <div className="content">
+        <Routes>
+          <Route path="/license" element={<License />} />
+          <Route
+            path="/"
+            element={
+              <ProtectedRoute>
+                <Home />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/xls"
+            element={
+              <ProtectedRoute>
+                <Xls />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/xml"
+            element={
+              <ProtectedRoute>
+                <Xml />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/speed"
+            element={
+              <ProtectedRoute>
+                <Speed />
+              </ProtectedRoute>
+            }
+          />
+        </Routes>
       </div>
-    </Router>
+    </div>
+  );
+};
+
+const App = () => {
+  return (
+    <LicenseProvider>
+      <Router>
+        <AppContent />
+      </Router>
+    </LicenseProvider>
   );
 };
 

@@ -3,6 +3,8 @@ import os
 import pandas as pd
 import xml.etree.ElementTree as ET
 import json
+import base64
+from typing import Optional, Dict
 
 # Configuração do Pyloid
 app = Pyloid(app_name="Projeto", single_instance=True)
@@ -448,22 +450,113 @@ class SpreadsheetProcessingAPI(PyloidAPI):
         window.show_and_focus()
 
         return "Nova janela aberta com sucesso"
+    
+class DecodeHash(PyloidAPI):
+    @Bridge(str, result=str)
+    def decode_base64(self, input: str) -> str:
+        """
+        Decodifica uma string Base64 para texto original.
+        """
+        try:
+            # Adiciona padding necessário para Base64 válido
+            missing_padding = len(input) % 4
+            if missing_padding:
+                input += '=' * (4 - missing_padding)
+            return base64.b64decode(input.encode('utf-8')).decode('utf-8')
+        except Exception as e:
+            raise ValueError(f"Erro ao decodificar Base64: {e}")
+    
+    @Bridge(str, result=dict)
+    def decode_license(self, license: str) -> dict:
+        """
+        Decodifica uma licença para obter os dados originais.
 
+        Args:
+            license (str): A licença no formato XXXXX-XXXXX-XXXXX-XXXXX.
+
+        Returns:
+            dict: Resultado da validação com sucesso ou mensagem de erro.
+        """
+        try:
+            # Remove hífens e caracteres de preenchimento 'X'
+            stripped_license = license.replace("-", "").rstrip("X")
+
+            # Decodifica a string Base64
+            decoded_data = self.decode_base64(stripped_license)
+
+            # Divide os dados em ID e data
+            id_part, expiration_date = decoded_data.split(":")
+
+            # Valida os dados
+            if not id_part or not expiration_date:
+                raise ValueError("Formato inválido.")
+
+            # Reconstrói a data no formato YYYY-MM-DD
+            formatted_date = f"{expiration_date[:4]}-{expiration_date[4:6]}-{expiration_date[6:8]}"
+
+            return {"success": True, "id": id_part, "expirationDate": formatted_date}
+        except Exception as e:
+            print(f"Erro ao decodificar a licença: {e}")
+            return {"success": False, "message": "Licença inválida ou expirada."}
+        
+class LicenseStorageAPI(PyloidAPI):
+    FILE_PATH = os.path.join(os.getcwd(), "license_data.json")
+
+    @staticmethod
+    def save_data(data: dict):
+        """Salva os dados em um arquivo JSON."""
+        try:
+            with open(LicenseStorageAPI.FILE_PATH, "w") as f:
+                json.dump(data, f)
+            return {"success": True, "message": "Dados salvos com sucesso."}
+        except Exception as e:
+            return {"success": False, "message": f"Erro ao salvar dados: {e}"}
+
+    @staticmethod
+    def load_data():
+        """Carrega os dados do arquivo JSON."""
+        try:
+            if not os.path.exists(LicenseStorageAPI.FILE_PATH):
+                return {"success": False, "message": "Arquivo não encontrado."}
+            with open(LicenseStorageAPI.FILE_PATH, "r") as f:
+                data = json.load(f)
+            return {"success": True, "data": data}
+        except Exception as e:
+            return {"success": False, "message": f"Erro ao carregar dados: {e}"}
+
+    @Bridge(str, str, result=str)
+    def save_license(self, license_key: str, validation_result: str):
+        """Salva a licença e o resultado da validação."""
+        data = {
+            "licenseKey": license_key,
+            "licenseValidation": validation_result,
+        }
+        return LicenseStorageAPI.save_data(data)
+
+    @Bridge(result=dict)
+    def load_license(self):
+        """Carrega a licença salva."""
+        return LicenseStorageAPI.load_data()
 
 # Configuração Principal do Pyloid
 try:
     if is_production():
         window = app.create_window(
             title="Projeto",
-            js_apis=[CustomAPI(), XMLProcessingAPI(), SpreadsheetProcessingAPI()],
+            js_apis=[CustomAPI(), XMLProcessingAPI(), SpreadsheetProcessingAPI(), DecodeHash(), LicenseStorageAPI()],
         )
         window.load_file(os.path.join(get_production_path(), "build/index.html"))
+        window.set_static_image_splash_screen(image_path="src-pyloid/icons/icon.png")
+        window.set_position_by_anchor("center")
     else:
         window = app.create_window(
             title="Projeto",
-            js_apis=[CustomAPI(), XMLProcessingAPI(), SpreadsheetProcessingAPI()],
+            js_apis=[CustomAPI(), XMLProcessingAPI(), SpreadsheetProcessingAPI(), DecodeHash(), LicenseStorageAPI()],
             dev_tools=True,
         )
+        window.set_dev_tools(True)
+        window.set_static_image_splash_screen(image_path="src-pyloid/icons/icon.png")
+        window.set_position_by_anchor("center")
         window.load_url("http://localhost:5173")
     window.show_and_focus()
     window.set_dev_tools(True)
