@@ -1,38 +1,49 @@
 import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
+import {
+  Container,
+  Row,
+  Col,
+  Form,
+  Button,
+  Spinner,
+  Alert,
+} from "react-bootstrap";
 
 const License: React.FC = () => {
   const [license, setLicense] = useState("");
   const [validationResult, setValidationResult] = useState<string | null>(null);
-  const [isLoading, setIsLoading] = useState(true); // Adiciona controle de carregamento
+  const [isLoading, setIsLoading] = useState(true);
+  const [isValidating, setIsValidating] = useState(false);
+  const [hasNavigated, setHasNavigated] = useState(false); // Controle para evitar navegação repetida
   const navigate = useNavigate();
 
-  const loadLicense = async () => {
-    try {
-      const result = await window.pyloid.LicenseStorageAPI.load_license();
-      console.log("Carregando licença:", result);
-
-      if (result.success && result.data.licenseValidation) {
-        setLicense(result.data.licenseKey || "");
-        setValidationResult(result.data.licenseValidation);
-
-        // Redireciona para a Home se ainda não estiver nela
-        if (window.location.pathname !== "/") {
-          navigate("/", { replace: true });
-        }
-      }
-    } catch (error) {
-      console.error("Erro ao carregar a licença:", error);
-    } finally {
-      setIsLoading(false); // Finaliza o carregamento
-    }
-  };
-
   useEffect(() => {
+    const loadLicense = async () => {
+      try {
+        const result = await window.pyloid.LicenseStorageAPI.load_license();
+        console.log("Carregando licença:", result);
+
+        if (result.success && result.data.licenseValidation) {
+          setLicense(result.data.licenseKey || "");
+          setValidationResult(result.data.licenseValidation);
+
+          if (!hasNavigated && window.location.pathname !== "/") {
+            setHasNavigated(true);
+            navigate("/", { replace: true });
+          }
+        }
+      } catch (error) {
+        console.error("Erro ao carregar a licença:", error);
+      } finally {
+        setIsLoading(false);
+      }
+    };
     loadLicense();
-  }, []); // Executa apenas uma vez ao montar o componente
+  }, [navigate, hasNavigated]);
 
   const validateLicense = async () => {
+    setIsValidating(true);
     try {
       console.log("Validando licença:", license);
       const result = await window.pyloid.DecodeHash.decode_license(license);
@@ -42,72 +53,93 @@ const License: React.FC = () => {
         const validationMessage = `Licença válida! ID: ${result.id}, Data de Expiração: ${result.expirationDate}`;
         setValidationResult(validationMessage);
 
-        // Salva os dados no sistema de arquivos
-        const saveResult = await window.pyloid.LicenseStorageAPI.save_license(
+        await window.pyloid.LicenseStorageAPI.save_license(
           license,
           validationMessage
         );
-        console.log("Resultado do salvamento:", saveResult);
 
-        // Recarrega a licença para redirecionar
-        loadLicense();
+        setLicense(license);
+        setValidationResult(validationMessage);
+
+        if (!hasNavigated && window.location.pathname !== "/") {
+          setHasNavigated(true);
+          navigate("/", { replace: true });
+        }
       } else {
         const errorMessage = result.message || "Licença inválida ou expirada.";
         setValidationResult(errorMessage);
-
-        // Remove dados inválidos
         await window.pyloid.LicenseStorageAPI.save_license("", "");
       }
     } catch (error) {
       const errorMessage = "Erro ao comunicar com o backend.";
       setValidationResult(errorMessage);
-
-      // Remove dados em caso de erro
       await window.pyloid.LicenseStorageAPI.save_license("", "");
       console.error("Erro durante a validação:", error);
+    } finally {
+      setIsValidating(false);
     }
   };
 
   if (isLoading) {
-    return <div>Carregando...</div>; // Exibe um carregador enquanto verifica a licença
+    return (
+      <Container
+        fluid
+        className="d-flex justify-content-center align-items-center"
+        style={{ height: "100vh" }}
+      >
+        <Spinner animation="border" role="status">
+          <span className="visually-hidden">Carregando...</span>
+        </Spinner>
+      </Container>
+    );
   }
 
   return (
-    <div style={{ padding: "20px", fontFamily: "Arial, sans-serif" }}>
-      <h1>Validação de Licença</h1>
-      <input
-        type="text"
-        value={license}
-        onChange={(e) => setLicense(e.target.value)}
-        placeholder="Digite sua licença"
-        style={{ padding: "10px", width: "100%", marginBottom: "10px" }}
-      />
-      <button
-        onClick={validateLicense}
-        style={{
-          padding: "10px 20px",
-          backgroundColor: "#007BFF",
-          color: "#fff",
-          border: "none",
-          borderRadius: "5px",
-          cursor: "pointer",
-        }}
-      >
-        Validar Licença
-      </button>
-      {validationResult && (
-        <div
-          style={{
-            marginTop: "20px",
-            padding: "10px",
-            border: "1px solid #ccc",
-            borderRadius: "5px",
-          }}
-        >
-          {validationResult}
-        </div>
-      )}
-    </div>
+    <Container
+      fluid
+      className="d-flex justify-content-center align-items-center"
+      style={{ height: "100vh" }}
+    >
+      <Row className="w-100 justify-content-center">
+        <Col md={6} lg={4} className="bg-light p-4 rounded shadow">
+          <h1 className="text-center mb-4">Validação de Licença</h1>
+          <Form>
+            <Form.Group controlId="licenseInput">
+              <Form.Label>Digite sua licença</Form.Label>
+              <Form.Control
+                type="text"
+                value={license}
+                onChange={(e) => setLicense(e.target.value)}
+                placeholder="Digite sua licença aqui"
+              />
+            </Form.Group>
+            <div className="d-grid gap-2 mt-3">
+              <Button
+                variant="primary"
+                onClick={validateLicense}
+                disabled={isValidating || !license.trim()}
+              >
+                {isValidating ? (
+                  <Spinner as="span" animation="border" size="sm" />
+                ) : (
+                  "Validar Licença"
+                )}
+              </Button>
+            </div>
+          </Form>
+          {validationResult && (
+            <Alert
+              className="mt-4"
+              variant={
+                validationResult.includes("válida") ? "success" : "danger"
+              }
+            >
+              {validationResult}
+            </Alert>
+          )}
+        </Col>
+      </Row>
+    </Container>
   );
 };
 

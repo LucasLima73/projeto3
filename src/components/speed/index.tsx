@@ -5,7 +5,7 @@ import "./index.css";
 const Speed = () => {
   const [selectedFilesMessage, setSelectedFilesMessage] = useState("");
   const [selectedDirectoryMessage, setSelectedDirectoryMessage] = useState("");
-  const [fileName, setFileName] = useState("");
+  const [excelFileName, setExcelFileName] = useState("");
   const [recordNumbers, setRecordNumbers] = useState("");
   const [processingMessage, setProcessingMessage] = useState("");
 
@@ -27,16 +27,31 @@ const Speed = () => {
     }
   };
 
-  const processFiles = async () => {
-    if (!fileName || !recordNumbers) {
-      setProcessingMessage("O nome do arquivo e os números dos registros são obrigatórios.");
+  const processSpedToExcel = async () => {
+    if (!excelFileName || !recordNumbers) {
+      setProcessingMessage("O nome do arquivo Excel e os números dos registros são obrigatórios.");
       return;
     }
     try {
-      const response = await window.pyloid.CustomAPI.process_files(fileName, recordNumbers);
+      const response = await window.pyloid.CustomAPI.process_files(excelFileName, recordNumbers);
       setProcessingMessage(response.message);
     } catch (error) {
-      console.error("Erro ao processar arquivos:", error);
+      console.error("Erro ao processar arquivos SPED para Excel:", error);
+    }
+  };
+
+  const convertExcelToSped = async () => {
+    if (!excelFileName) {
+      setProcessingMessage("Por favor, selecione o arquivo Excel para conversão.");
+      return;
+    }
+    try {
+      const addName = excelFileName + ".xlsx";
+      const response = await window.pyloid.CustomAPI.convert_excel_to_sped(addName);
+      setProcessingMessage(response.message);
+    } catch (error) {
+      console.error("Erro ao converter Excel para SPED:", error);
+      setProcessingMessage("Erro ao converter Excel para SPED.");
     }
   };
 
@@ -46,7 +61,7 @@ const Speed = () => {
         <Col md={8}>
           <Card className="mt-4">
             <Card.Body>
-              <Card.Title className="text-center">Processamento de Arquivos SPED</Card.Title>
+              <Card.Title className="text-center">Conversor SPED ↔ Excel</Card.Title>
               <hr />
               {processingMessage && (
                 <Alert variant={processingMessage.includes("Erro") ? "danger" : "success"}>
@@ -56,25 +71,25 @@ const Speed = () => {
               <Form>
                 <Form.Group className="mb-3">
                   <Button variant="primary" onClick={selectFiles}>
-                    Selecionar Arquivos
+                    Selecionar Arquivos SPED
                   </Button>
                   {selectedFilesMessage && <Form.Text>{selectedFilesMessage}</Form.Text>}
                 </Form.Group>
 
                 <Form.Group className="mb-3">
                   <Button variant="secondary" onClick={selectDirectory}>
-                    Selecionar Diretório
+                    Selecionar Diretório de Salvamento
                   </Button>
                   {selectedDirectoryMessage && <Form.Text>{selectedDirectoryMessage}</Form.Text>}
                 </Form.Group>
 
                 <Form.Group className="mb-3">
-                  <Form.Label>Nome do Arquivo de Saída</Form.Label>
+                  <Form.Label>Nome do Arquivo Excel de Saída</Form.Label>
                   <Form.Control
                     type="text"
-                    placeholder="Digite o nome do arquivo"
-                    value={fileName}
-                    onChange={(e) => setFileName(e.target.value)}
+                    placeholder="Digite o nome do arquivo Excel"
+                    value={excelFileName}
+                    onChange={(e) => setExcelFileName(e.target.value)}
                   />
                 </Form.Group>
 
@@ -88,9 +103,15 @@ const Speed = () => {
                   />
                 </Form.Group>
 
+                <div className="d-grid gap-2 mb-3">
+                  <Button variant="success" onClick={processSpedToExcel}>
+                    Converter SPED para Excel
+                  </Button>
+                </div>
+
                 <div className="d-grid">
-                  <Button variant="success" size="lg" onClick={processFiles}>
-                    Iniciar Processamento
+                  <Button variant="warning" onClick={convertExcelToSped}>
+                    Converter Excel para SPED
                   </Button>
                 </div>
               </Form>

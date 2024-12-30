@@ -32,20 +32,17 @@ class CustomAPI(PyloidAPI):
             if file_paths:
                 self.selected_files = file_paths if isinstance(file_paths, list) else [file_paths]
                 message = f"{len(self.selected_files)} arquivo(s) selecionado(s)."
-                # Notificação de sucesso
                 app.show_notification(
                     title="Arquivos Selecionados",
                     message=message,
                 )
                 return {"success": True, "message": message}
-            # Notificação de aviso
             app.show_notification(
                 title="Nenhum Arquivo Selecionado",
                 message="Nenhum arquivo foi selecionado.",
             )
             return {"success": False, "message": "Nenhum arquivo selecionado."}
         except Exception as e:
-            # Notificação de erro
             app.show_notification(
                 title="Erro ao Selecionar Arquivos",
                 message=f"Erro: {str(e)}",
@@ -60,20 +57,17 @@ class CustomAPI(PyloidAPI):
             if directory:
                 self.save_directory = directory
                 message = f"Diretório selecionado: {self.save_directory}"
-                # Notificação de sucesso
                 app.show_notification(
                     title="Diretório Selecionado",
                     message=message,
                 )
                 return {"success": True, "message": message}
-            # Notificação de aviso
             app.show_notification(
                 title="Nenhum Diretório Selecionado",
                 message="Nenhum diretório foi selecionado.",
             )
             return {"success": False, "message": "Nenhum diretório selecionado."}
         except Exception as e:
-            # Notificação de erro
             app.show_notification(
                 title="Erro ao Selecionar Diretório",
                 message=f"Erro: {str(e)}",
@@ -86,35 +80,64 @@ class CustomAPI(PyloidAPI):
         try:
             save_path = app.save_file_dialog(
                 dir=self.save_directory or os.getcwd(),
-                filter="Arquivos Excel (*.xlsx)"
+                filter="Arquivos TXT (*.txt)"
             )
             if save_path:
                 message = f"Arquivo será salvo em: {save_path}"
-                # Notificação de sucesso
                 app.show_notification(
                     title="Arquivo Salvo",
                     message=message,
                 )
                 return {"success": True, "message": message}
-            # Notificação de aviso
             app.show_notification(
                 title="Salvamento Cancelado",
                 message="O processo de salvamento foi cancelado.",
             )
             return {"success": False, "message": "Salvamento cancelado."}
         except Exception as e:
-            # Notificação de erro
             app.show_notification(
                 title="Erro ao Salvar Arquivo",
                 message=f"Erro: {str(e)}",
             )
             return {"success": False, "message": f"Erro ao salvar arquivo: {e}"}
 
+    @Bridge(str, result=str)
+    def convert_excel_to_sped(self, excel_file: str):
+        """Converte arquivo Excel para SPED."""
+        try:
+            if not self.save_directory:
+                raise ValueError("Nenhum diretório selecionado para salvar o arquivo.")
+
+            # Carrega o arquivo Excel
+            df = pd.read_excel(excel_file, header=None)
+
+            # Gera as linhas no formato SPED
+            sped_lines = ["|" + "|".join(map(str, row)) + "|" for row in df.values]
+
+            # Salva o resultado no formato SPED
+            save_path = os.path.join(
+                self.save_directory, 
+                os.path.splitext(os.path.basename(excel_file))[0] + ".txt"
+            )
+            with open(save_path, "w") as file:
+                file.write("\n".join(sped_lines))
+
+            app.show_notification(
+                title="Conversão Concluída",
+                message=f"Arquivo SPED gerado em: {save_path}",
+            )
+            return {"success": True, "message": f"Arquivo SPED salvo em: {save_path}"}
+        except Exception as e:
+            app.show_notification(
+                title="Erro na Conversão",
+                message=f"Erro: {str(e)}",
+            )
+            return {"success": False, "message": f"Erro na conversão: {e}"}
+
     @Bridge(str, str, result=str)
     def process_files(self, file_name: str, record_numbers: str):
         """Processa arquivos SPED com base nos números de registro fornecidos."""
         try:
-            # Validações iniciais
             if not self.selected_files:
                 raise ValueError("Nenhum arquivo selecionado para processar.")
             if not self.save_directory:
@@ -126,7 +149,6 @@ class CustomAPI(PyloidAPI):
             if not records:
                 raise ValueError("Por favor, insira ao menos um número de registro válido.")
 
-            # Processamento dos arquivos
             dataframes = {}
             for file_path in self.selected_files:
                 with open(file_path, "r", encoding="latin1") as f:
@@ -150,7 +172,6 @@ class CustomAPI(PyloidAPI):
             if not dataframes:
                 raise ValueError("Nenhum registro correspondente encontrado.")
 
-            # Salvando os dados
             save_path = os.path.join(
                 self.save_directory, file_name if file_name.endswith(".xlsx") else f"{file_name}.xlsx"
             )
@@ -161,20 +182,17 @@ class CustomAPI(PyloidAPI):
                     df = pd.DataFrame(data, columns=columns)
                     df.to_excel(writer, sheet_name=record_type, index=False)
 
-            # Notificação de sucesso
             app.show_notification(
                 title="Processamento Concluído",
                 message=f"Arquivo salvo em: {save_path}",
             )
             return {"success": True, "message": f"Processo concluído! Arquivo salvo em: {save_path}"}
         except Exception as e:
-            # Notificação de erro
             app.show_notification(
                 title="Erro no Processamento",
                 message=f"Erro: {str(e)}",
             )
             return {"success": False, "message": f"Erro no processamento: {e}"}
-
 
 # Classe para Processamento de XML
 class XMLProcessingAPI(PyloidAPI):
