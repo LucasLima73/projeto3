@@ -43,17 +43,11 @@ const AppContent = () => {
               className={({ isActive }) =>
                 `sidebar-link ${isActive ? "active" : ""}`
               }
-              className={({ isActive }) =>
-                `sidebar-link ${isActive ? "active" : ""}`
-              }
             >
               Home
             </NavLink>
             <NavLink
               to="/xls"
-              className={({ isActive }) =>
-                `sidebar-link ${isActive ? "active" : ""}`
-              }
               className={({ isActive }) =>
                 `sidebar-link ${isActive ? "active" : ""}`
               }
@@ -65,17 +59,11 @@ const AppContent = () => {
               className={({ isActive }) =>
                 `sidebar-link ${isActive ? "active" : ""}`
               }
-              className={({ isActive }) =>
-                `sidebar-link ${isActive ? "active" : ""}`
-              }
             >
               XML
             </NavLink>
             <NavLink
               to="/speed"
-              className={({ isActive }) =>
-                `sidebar-link ${isActive ? "active" : ""}`
-              }
               className={({ isActive }) =>
                 `sidebar-link ${isActive ? "active" : ""}`
               }
