@@ -88,7 +88,6 @@ class CustomAPI(PyloidAPI):
             save_path = app.save_file_dialog(
                 dir=self.save_directory or os.getcwd(),
                 filter="Arquivos TXT (*.txt)"
-                filter="Arquivos TXT (*.txt)"
             )
             if save_path:
                 message = f"Arquivo será salvo em: {save_path}"

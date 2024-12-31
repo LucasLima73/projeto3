@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useContext } from "react";
 import {
   Container,
   Row,
@@ -9,34 +9,31 @@ import {
   Alert,
 } from "react-bootstrap";
 import { useNavigate } from "react-router-dom";
-import './index.css';  // Importando o CSS para centralização
+import LicenseContext from "../../LicenseContext";
+import "./index.css"; // Importando o CSS para centralização
 
 const License: React.FC = () => {
   const [license, setLicense] = useState("");
   const [validationResult, setValidationResult] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isValidating, setIsValidating] = useState(false);
+  const { setHasValidLicense } = useContext(LicenseContext)!; // Obtém o setter do contexto
   const navigate = useNavigate();
 
   useEffect(() => {
     const loadLicense = async () => {
       try {
         const result = await window.pyloid.LicenseStorageAPI.load_license();
-        console.log("Carregando licença:", result);
-
         if (result.success && result.data.licenseValidation) {
           setLicense(result.data.licenseKey || "");
           setValidationResult(result.data.licenseValidation);
 
-          // Verifica se a rota atual é diferente de `/license`
-          if (window.location.pathname !== "/license") {
-            const expirationDate = new Date(result.data.licenseValidation);
-            const today = new Date();
+          const expirationDate = new Date(result.data.licenseValidation);
+          const today = new Date();
 
-            if (expirationDate >= today) {
-              // Redireciona apenas se a licença for válida e a rota não for `/license`
-              navigate("/", { replace: true });
-            }
+          if (expirationDate >= today) {
+            setHasValidLicense(true); // Atualiza o estado global
+            navigate("/dashboard", { replace: true }); // Redireciona para o dashboard
           }
         }
       } catch (error) {
@@ -45,16 +42,14 @@ const License: React.FC = () => {
         setIsLoading(false);
       }
     };
+
     loadLicense();
-  }, []);
+  }, [navigate, setHasValidLicense]);
 
   const validateLicense = async () => {
     setIsValidating(true);
     try {
-      console.log("Validando licença:", license);
       const result = await window.pyloid.DecodeHash.decode_license(license);
-      console.log("Resultado da validação:", result);
-
       if (result.success) {
         const validationMessage = `${result.expirationDate}`;
         setValidationResult(validationMessage);
@@ -68,7 +63,8 @@ const License: React.FC = () => {
         const today = new Date();
 
         if (expirationDate >= today) {
-          navigate("/", { replace: true });
+          setHasValidLicense(true); // Atualiza o estado global
+          navigate("/dashboard", { replace: true });
         }
       } else {
         const errorMessage = result.message || "Licença inválida ou expirada.";
@@ -76,10 +72,7 @@ const License: React.FC = () => {
         await window.pyloid.LicenseStorageAPI.save_license("", "");
       }
     } catch (error) {
-      const errorMessage = "Erro ao comunicar com o backend.";
-      setValidationResult(errorMessage);
-      await window.pyloid.LicenseStorageAPI.save_license("", "");
-      console.error("Erro durante a validação:", error);
+      console.error("Erro ao validar a licença:", error);
     } finally {
       setIsValidating(false);
     }
@@ -131,11 +124,10 @@ const License: React.FC = () => {
             >
               {validationResult.includes("válida")
                 ? "Licença válida"
-                : `Sua licença expirou em ${new Date(validationResult + 'T00:00:00').toLocaleDateString('pt-BR', {
-                    day: '2-digit',
-                    month: 'long',
-                    year: 'numeric'
-                  })}, contate o administrador do sistema`}
+                : `Sua licença expirou em ${new Date(validationResult + "T00:00:00").toLocaleDateString(
+                    "pt-BR",
+                    { day: "2-digit", month: "long", year: "numeric" }
+                  )}, contate o administrador do sistema`}
             </Alert>
           )}
         </Col>
