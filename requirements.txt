@@ -5,6 +5,13 @@ packaging==24.2
 pefile==2023.2.7
 pyinstaller-hooks-contrib==2024.10
 pywin32-ctypes==0.2.3
+altgraph==0.17.4
+Jinja2==3.1.4
+MarkupSafe==3.0.2
+packaging==24.2
+pefile==2023.2.7
+pyinstaller-hooks-contrib==2024.10
+pywin32-ctypes==0.2.3
 pyinstaller
 pyloid
 pandas

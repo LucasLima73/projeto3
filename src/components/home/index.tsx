@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { useState, useEffect } from "react";
 import { Modal, Button } from "react-bootstrap";
 import "./index.css";
 
@@ -36,6 +37,16 @@ const Home = () => {
       height: 400,
       url: "http://localhost:3000", // Substitua pelo URL da rota que contém o modal
     });
+  };
+
+  // Função para formatar a data no formato DD-MM-AAAA
+  const formatDate = (dateString: string) => {
+    try {
+      const [year, month, day] = dateString.split("-");
+      return `${day}-${month}-${year}`;
+    } catch {
+      return "Data inválida"; // Mensagem padrão em caso de erro
+    }
   };
 
   // Função para formatar a data no formato DD-MM-AAAA

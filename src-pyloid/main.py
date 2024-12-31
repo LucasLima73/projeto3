@@ -88,6 +88,7 @@ class CustomAPI(PyloidAPI):
             save_path = app.save_file_dialog(
                 dir=self.save_directory or os.getcwd(),
                 filter="Arquivos TXT (*.txt)"
+                filter="Arquivos TXT (*.txt)"
             )
             if save_path:
                 message = f"Arquivo será salvo em: {save_path}"
@@ -107,6 +108,39 @@ class CustomAPI(PyloidAPI):
                 message=f"Erro: {str(e)}",
             )
             return {"success": False, "message": f"Erro ao salvar arquivo: {e}"}
+
+    @Bridge(str, result=str)
+    def convert_excel_to_sped(self, excel_file: str):
+        """Converte arquivo Excel para SPED."""
+        try:
+            if not self.save_directory:
+                raise ValueError("Nenhum diretório selecionado para salvar o arquivo.")
+
+            # Carrega o arquivo Excel
+            df = pd.read_excel(excel_file, header=None)
+
+            # Gera as linhas no formato SPED
+            sped_lines = ["|" + "|".join(map(str, row)) + "|" for row in df.values]
+
+            # Salva o resultado no formato SPED
+            save_path = os.path.join(
+                self.save_directory, 
+                os.path.splitext(os.path.basename(excel_file))[0] + ".txt"
+            )
+            with open(save_path, "w") as file:
+                file.write("\n".join(sped_lines))
+
+            app.show_notification(
+                title="Conversão Concluída",
+                message=f"Arquivo SPED gerado em: {save_path}",
+            )
+            return {"success": True, "message": f"Arquivo SPED salvo em: {save_path}"}
+        except Exception as e:
+            app.show_notification(
+                title="Erro na Conversão",
+                message=f"Erro: {str(e)}",
+            )
+            return {"success": False, "message": f"Erro na conversão: {e}"}
 
     @Bridge(str, result=str)
     def convert_excel_to_sped(self, excel_file: str):
