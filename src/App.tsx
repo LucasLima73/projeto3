@@ -141,11 +141,7 @@ const AppContent = () => {
               className={({ isActive }) =>
                 `sidebar-link ${isActive ? "active" : ""}`
               }
-              className={({ isActive }) =>
-                `sidebar-link ${isActive ? "active" : ""}`
-              }
             >
-              Home
               Home
             </NavLink>
             <NavLink
@@ -153,11 +149,7 @@ const AppContent = () => {
               className={({ isActive }) =>
                 `sidebar-link ${isActive ? "active" : ""}`
               }
-              className={({ isActive }) =>
-                `sidebar-link ${isActive ? "active" : ""}`
-              }
             >
-              XLS
               XLS
             </NavLink>
             <NavLink
@@ -165,11 +157,7 @@ const AppContent = () => {
               className={({ isActive }) =>
                 `sidebar-link ${isActive ? "active" : ""}`
               }
-              className={({ isActive }) =>
-                `sidebar-link ${isActive ? "active" : ""}`
-              }
             >
-              XML
               XML
             </NavLink>
             <NavLink
@@ -177,14 +165,9 @@ const AppContent = () => {
               className={({ isActive }) =>
                 `sidebar-link ${isActive ? "active" : ""}`
               }
-              className={({ isActive }) =>
-                `sidebar-link ${isActive ? "active" : ""}`
-              }
             >
               TXT
-              TXT
             </NavLink>
-          </nav>
           </nav>
         </div>
       )}
@@ -232,17 +215,6 @@ const AppContent = () => {
           </Routes>
         )}
       </div>
-    </div>
-  );
-};
-
-const App = () => {
-  return (
-    <LicenseProvider>
-      <Router>
-        <AppContent />
-      </Router>
-    </LicenseProvider>
     </div>
   );
 };
