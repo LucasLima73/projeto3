@@ -1,0 +1,33 @@
+/* License.css */
+
+/* Container que ocupa toda a altura da tela e usa flexbox para centralizar o conteúdo */
+.license-container {
+    display: flex; 
+    flex-direction: column; 
+    justify-content: center; 
+    align-items: center; 
+    padding: 20px 0; 
+    background-color: #f9f9f9;
+    margin: 0;
+    overflow: hidden; /* Evita rolagem */
+    width: 100%; /* Garante que o container ocupe toda a largura da tela */
+    box-sizing: border-box; /* Certifica-se de que o padding não causa overflow */
+  }
+  
+  /* O conteúdo dentro do formulário */
+  .bg-light {
+    max-width: 400px;
+    width: 100%;
+  }
+  
+  /* Para o alerta de validação */
+  .alert {
+    word-wrap: break-word;
+  }
+  
+  /* Garante que o spinner seja centralizado enquanto carrega */
+  .spinner-border {
+    display: block;
+    margin: auto;
+  }
+  

@@ -1,22 +1,23 @@
-/* Corrige o espaço lateral e garante o preenchimento completo */
 .xml-container {
-  display: flex; /* Habilita layout flexbox */
-  flex-direction: column; /* Organiza os itens verticalmente */
-  justify-content: center; /* Centraliza verticalmente */
-  align-items: center; /* Centraliza horizontalmente */
-  padding: 20px 0; /* Espaço vertical interno */
+  display: flex; 
+  flex-direction: column; 
+  justify-content: center; 
+  align-items: center; 
+  padding: 20px 0; 
   background-color: #f9f9f9;
-  height: 100vh; /* Usa exatamente a altura da tela */
-  margin: 0; /* Remove margens externas */
-  overflow: hidden; /* Remove rolagem extra */
+  margin: 0;
+  overflow: hidden; /* Evita rolagem */
+  width: 100%; /* Garante que o container ocupe toda a largura da tela */
+  box-sizing: border-box; /* Certifica-se de que o padding não causa overflow */
 }
 
-/* Ajusta o layout do Card */
+/* Ajuste o Card para não ultrapassar a largura */
 .card {
   border-radius: 8px;
   box-shadow: 0px 4px 10px rgba(0, 0, 0, 0.1);
-  width: 100%; /* O Card ocupa 100% da largura disponível */
-  max-width: 600px; /* Define uma largura máxima */
+  width: 100%; /* Card ocupa 100% da largura do seu container */
+  max-width: 800px; /* Ajuste para largura maior, se necessário */
+  box-sizing: border-box; /* Previne overflow com padding */
 }
 
 /* Estilização do título do Card */
@@ -65,11 +66,12 @@ button {
 /* Ajusta a tabela para o modal */
 .table-responsive {
   margin: 0 auto;
-  overflow-x: auto;
+  overflow-x: auto; /* Adiciona rolagem horizontal quando necessário */
 }
 
 /* Ajusta o modal para não ultrapassar a tela */
 .modal-body {
   max-height: 70vh; /* Limita a altura do modal */
-  overflow-y: auto; /* Adiciona rolagem dentro do modal, se necessário */
+  overflow-y: auto; /* Adiciona rolagem vertical dentro do modal */
 }
+

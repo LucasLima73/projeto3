@@ -1,10 +1,14 @@
 .home-container {
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  min-height: 100vh;
-  background-color: #f4f4f9;
-  font-family: Arial, sans-serif;
+  display: flex; 
+  flex-direction: column; 
+  justify-content: center; 
+  align-items: center; 
+  padding: 20px 0; 
+  background-color: #f9f9f9;
+  margin: 0;
+  overflow: hidden; /* Evita rolagem */
+  width: 100%; /* Garante que o container ocupe toda a largura da tela */
+  box-sizing: border-box; /* Certifica-se de que o padding não causa overflow */
 }
 
 .home-card {
@@ -43,4 +47,18 @@
 
 .home-button:hover {
   background-color: #357ab8;
+}
+.footer {
+  position: fixed;
+  bottom: 0;
+  background-color: #f8f9fa;
+  text-align: center;
+  padding: 10px 0;
+  border-top: 1px solid #ddd;
+}
+
+.footer-text {
+  margin: 0;
+  font-size: 14px;
+  color: #555;
 }

@@ -4,10 +4,11 @@ import App from './App.tsx';
 import './index.css';
 import "bootstrap/dist/css/bootstrap.min.css";
 
-document.addEventListener('pyloidReady', () => {
-  createRoot(document.getElementById('root')!).render(
+document.addEventListener("pyloidReady", () => {
+  createRoot(document.getElementById("root")!).render(
     <StrictMode>
       <App />
     </StrictMode>
   );
 });
+

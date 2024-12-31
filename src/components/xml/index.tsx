@@ -96,7 +96,7 @@ const Xml = () => {
   return (
     <Container className="xml-container">
       <Row className="justify-content-center">
-        <Col md={8}>
+        <Col>
           <Card className="mt-4">
             <Card.Body>
               <Card.Title>Processador de XML</Card.Title>

@@ -3,16 +3,25 @@ import os
 import pandas as pd
 import xml.etree.ElementTree as ET
 import json
+import base64
+import platform  
+from cryptography.fernet import Fernet
+from typing import Optional, Dict
 
 # Configuração do Pyloid
-app = Pyloid(app_name="Projeto", single_instance=True)
+app = Pyloid(app_name="IVFTax", single_instance=True)
 
 if is_production():
     app.set_icon(os.path.join(get_production_path(), "icons/icon.png"))
     app.set_tray_icon(os.path.join(get_production_path(), "icons/icon.png"))
+    splash_image_path = os.path.join(get_production_path(), "icons/icon.png")
+    production_path = get_production_path()
+    
 else:
     app.set_icon("src-pyloid/icons/icon.png")
     app.set_tray_icon("src-pyloid/icons/icon.png")
+    splash_image_path = "src-pyloid/icons/splash.png"
+  
 
 # Classe API Customizada
 class CustomAPI(PyloidAPI):
@@ -30,20 +39,17 @@ class CustomAPI(PyloidAPI):
             if file_paths:
                 self.selected_files = file_paths if isinstance(file_paths, list) else [file_paths]
                 message = f"{len(self.selected_files)} arquivo(s) selecionado(s)."
-                # Notificação de sucesso
                 app.show_notification(
                     title="Arquivos Selecionados",
                     message=message,
                 )
                 return {"success": True, "message": message}
-            # Notificação de aviso
             app.show_notification(
                 title="Nenhum Arquivo Selecionado",
                 message="Nenhum arquivo foi selecionado.",
             )
             return {"success": False, "message": "Nenhum arquivo selecionado."}
         except Exception as e:
-            # Notificação de erro
             app.show_notification(
                 title="Erro ao Selecionar Arquivos",
                 message=f"Erro: {str(e)}",
@@ -58,20 +64,17 @@ class CustomAPI(PyloidAPI):
             if directory:
                 self.save_directory = directory
                 message = f"Diretório selecionado: {self.save_directory}"
-                # Notificação de sucesso
                 app.show_notification(
                     title="Diretório Selecionado",
                     message=message,
                 )
                 return {"success": True, "message": message}
-            # Notificação de aviso
             app.show_notification(
                 title="Nenhum Diretório Selecionado",
                 message="Nenhum diretório foi selecionado.",
             )
             return {"success": False, "message": "Nenhum diretório selecionado."}
         except Exception as e:
-            # Notificação de erro
             app.show_notification(
                 title="Erro ao Selecionar Diretório",
                 message=f"Erro: {str(e)}",
@@ -84,35 +87,64 @@ class CustomAPI(PyloidAPI):
         try:
             save_path = app.save_file_dialog(
                 dir=self.save_directory or os.getcwd(),
-                filter="Arquivos Excel (*.xlsx)"
+                filter="Arquivos TXT (*.txt)"
             )
             if save_path:
                 message = f"Arquivo será salvo em: {save_path}"
-                # Notificação de sucesso
                 app.show_notification(
                     title="Arquivo Salvo",
                     message=message,
                 )
                 return {"success": True, "message": message}
-            # Notificação de aviso
             app.show_notification(
                 title="Salvamento Cancelado",
                 message="O processo de salvamento foi cancelado.",
             )
             return {"success": False, "message": "Salvamento cancelado."}
         except Exception as e:
-            # Notificação de erro
             app.show_notification(
                 title="Erro ao Salvar Arquivo",
                 message=f"Erro: {str(e)}",
             )
             return {"success": False, "message": f"Erro ao salvar arquivo: {e}"}
 
+    @Bridge(str, result=str)
+    def convert_excel_to_sped(self, excel_file: str):
+        """Converte arquivo Excel para SPED."""
+        try:
+            if not self.save_directory:
+                raise ValueError("Nenhum diretório selecionado para salvar o arquivo.")
+
+            # Carrega o arquivo Excel
+            df = pd.read_excel(excel_file, header=None)
+
+            # Gera as linhas no formato SPED
+            sped_lines = ["|" + "|".join(map(str, row)) + "|" for row in df.values]
+
+            # Salva o resultado no formato SPED
+            save_path = os.path.join(
+                self.save_directory, 
+                os.path.splitext(os.path.basename(excel_file))[0] + ".txt"
+            )
+            with open(save_path, "w") as file:
+                file.write("\n".join(sped_lines))
+
+            app.show_notification(
+                title="Conversão Concluída",
+                message=f"Arquivo SPED gerado em: {save_path}",
+            )
+            return {"success": True, "message": f"Arquivo SPED salvo em: {save_path}"}
+        except Exception as e:
+            app.show_notification(
+                title="Erro na Conversão",
+                message=f"Erro: {str(e)}",
+            )
+            return {"success": False, "message": f"Erro na conversão: {e}"}
+
     @Bridge(str, str, result=str)
     def process_files(self, file_name: str, record_numbers: str):
         """Processa arquivos SPED com base nos números de registro fornecidos."""
         try:
-            # Validações iniciais
             if not self.selected_files:
                 raise ValueError("Nenhum arquivo selecionado para processar.")
             if not self.save_directory:
@@ -124,7 +156,6 @@ class CustomAPI(PyloidAPI):
             if not records:
                 raise ValueError("Por favor, insira ao menos um número de registro válido.")
 
-            # Processamento dos arquivos
             dataframes = {}
             for file_path in self.selected_files:
                 with open(file_path, "r", encoding="latin1") as f:
@@ -148,7 +179,6 @@ class CustomAPI(PyloidAPI):
             if not dataframes:
                 raise ValueError("Nenhum registro correspondente encontrado.")
 
-            # Salvando os dados
             save_path = os.path.join(
                 self.save_directory, file_name if file_name.endswith(".xlsx") else f"{file_name}.xlsx"
             )
@@ -159,20 +189,31 @@ class CustomAPI(PyloidAPI):
                     df = pd.DataFrame(data, columns=columns)
                     df.to_excel(writer, sheet_name=record_type, index=False)
 
-            # Notificação de sucesso
             app.show_notification(
                 title="Processamento Concluído",
                 message=f"Arquivo salvo em: {save_path}",
             )
             return {"success": True, "message": f"Processo concluído! Arquivo salvo em: {save_path}"}
         except Exception as e:
-            # Notificação de erro
             app.show_notification(
                 title="Erro no Processamento",
                 message=f"Erro: {str(e)}",
             )
             return {"success": False, "message": f"Erro no processamento: {e}"}
 
+    @Bridge(result=bool)
+    def is_production(self):
+        """Verifica se o ambiente é de produção."""
+        return is_production()
+        
+    @Bridge(result=str)
+    def get_production_path(self):
+        """Retorna o caminho de produção."""
+        try:
+            return get_production_path() if is_production() else ""
+        except Exception as e:
+            print(f"Erro ao obter o caminho de produção: {e}")
+            return ""
 
 # Classe para Processamento de XML
 class XMLProcessingAPI(PyloidAPI):
@@ -448,26 +489,184 @@ class SpreadsheetProcessingAPI(PyloidAPI):
         window.show_and_focus()
 
         return "Nova janela aberta com sucesso"
+    
+class DecodeHash(PyloidAPI):
+    @Bridge(str, result=str)
+    def decode_base64(self, input: str) -> str:
+        """
+        Decodifica uma string Base64 para texto original.
+        """
+        try:
+            # Adiciona padding necessário para Base64 válido
+            missing_padding = len(input) % 4
+            if missing_padding:
+                input += '=' * (4 - missing_padding)
+            return base64.b64decode(input.encode('utf-8')).decode('utf-8')
+        except Exception as e:
+            raise ValueError(f"Erro ao decodificar Base64: {e}")
+    
+    @Bridge(str, result=dict)
+    def decode_license(self, license: str) -> dict:
+        """
+        Decodifica uma licença para obter os dados originais.
 
+        Args:
+            license (str): A licença no formato XXXXX-XXXXX-XXXXX-XXXXX.
+
+        Returns:
+            dict: Resultado da validação com sucesso ou mensagem de erro.
+        """
+        try:
+            # Remove hífens e caracteres de preenchimento 'X'
+            stripped_license = license.replace("-", "").rstrip("X")
+
+            # Decodifica a string Base64
+            decoded_data = self.decode_base64(stripped_license)
+
+            # Divide os dados em ID e data
+            id_part, expiration_date = decoded_data.split(":")
+
+            # Valida os dados
+            if not id_part or not expiration_date:
+                raise ValueError("Formato inválido.")
+
+            # Reconstrói a data no formato YYYY-MM-DD
+            formatted_date = f"{expiration_date[:4]}-{expiration_date[4:6]}-{expiration_date[6:8]}"
+
+            return {"success": True, "id": id_part, "expirationDate": formatted_date}
+        except Exception as e:
+            print(f"Erro ao decodificar a licença: {e}")
+            return {"success": False, "message": "Licença inválida ou expirada."}
+        
+class LicenseStorageAPI(PyloidAPI):
+    APP_NAME = "IVFTax"
+    
+    # Diretório de armazenamento baseado no sistema operacional
+    if platform.system() == "Windows":
+        BASE_DIR = os.path.join(os.getenv("LOCALAPPDATA"), APP_NAME)
+    else:
+        BASE_DIR = os.path.expanduser(f"~/.{APP_NAME}")
+    
+    FILE_PATH = os.path.join(BASE_DIR, "license_data.json")
+
+    @staticmethod
+    def ensure_directory():
+        """Garante que o diretório de armazenamento existe."""
+        if not os.path.exists(LicenseStorageAPI.BASE_DIR):
+            os.makedirs(LicenseStorageAPI.BASE_DIR, exist_ok=True)
+
+    @staticmethod
+    def save_data(data: dict):
+        """Salva os dados em um arquivo JSON sem criptografia."""
+        try:
+            LicenseStorageAPI.ensure_directory()
+            with open(LicenseStorageAPI.FILE_PATH, "w", encoding="utf-8") as f:
+                json.dump(data, f, ensure_ascii=False, indent=4)
+            return {"success": True, "message": "Dados salvos com sucesso."}
+        except Exception as e:
+            return {"success": False, "message": f"Erro ao salvar dados: {e}"}
+
+    @staticmethod
+    def load_data():
+        """Carrega os dados do arquivo JSON sem criptografia."""
+        try:
+            if not os.path.exists(LicenseStorageAPI.FILE_PATH):
+                return {"success": False, "message": "Arquivo não encontrado."}
+            with open(LicenseStorageAPI.FILE_PATH, "r", encoding="utf-8") as f:
+                data = json.load(f)
+            return {"success": True, "data": data}
+        except Exception as e:
+            return {"success": False, "message": f"Erro ao carregar dados: {e}"}
+
+    @Bridge(str, str, result=str)
+    def save_license(self, license_key: str, validation_result: str):
+        """Salva a licença e o resultado da validação."""
+        data = {
+            "licenseKey": license_key,
+            "licenseValidation": validation_result,
+        }
+        return LicenseStorageAPI.save_data(data)
+
+    @Bridge(result=dict)
+    def load_license(self):
+        """Carrega a licença salva."""
+        return LicenseStorageAPI.load_data()
+
+
+# Configuração Principal do Pyloid
+from PySide6.QtCore import QThread
+import time
 
 # Configuração Principal do Pyloid
 try:
     if is_production():
+        # Configura a janela principal
         window = app.create_window(
-            title="Projeto",
-            js_apis=[CustomAPI(), XMLProcessingAPI(), SpreadsheetProcessingAPI()],
+            title="IVFTax",
+            js_apis=[CustomAPI(), XMLProcessingAPI(), SpreadsheetProcessingAPI(), DecodeHash(), LicenseStorageAPI()],
         )
-        window.load_file(os.path.join(get_production_path(), "build/index.html"))
+        # Configura a splash screen
+        window.set_static_image_splash_screen(
+            image_path=splash_image_path,
+            close_on_load=False,  # A splash não fecha automaticamente
+            stay_on_top=True,
+            clickable=False,
+            position="center",
+        )
+
+        # Worker para carregar o conteúdo principal
+        class SplashWorkerThread(QThread):
+            def run(self):
+                # Simula operações de inicialização (ex.: conexão com BD, carregamento de recursos)
+                time.sleep(2)  # Simula um carregamento de 2 segundos
+
+        # Callback após a conclusão do carregamento
+        def finish_callback():
+            window.load_file(os.path.join(get_production_path(), "build/index.html"))
+            window.set_position_by_anchor("center")
+            window.show_and_focus()
+            window.close_splash_screen()
+
+        # Cria e inicia o worker thread
+        splash_worker = SplashWorkerThread()
+        splash_worker.finished.connect(finish_callback)
+        splash_worker.start()
     else:
+        # Configura a janela principal para ambiente de desenvolvimento
         window = app.create_window(
-            title="Projeto",
-            js_apis=[CustomAPI(), XMLProcessingAPI(), SpreadsheetProcessingAPI()],
+            title="IVFTax",
+            js_apis=[CustomAPI(), XMLProcessingAPI(), SpreadsheetProcessingAPI(), DecodeHash(), LicenseStorageAPI()],
             dev_tools=True,
         )
-        window.load_url("http://localhost:5173")
-    window.show_and_focus()
+        # Configura a splash screen
+        window.set_static_image_splash_screen(
+            image_path="src-pyloid/icons/icon.png",
+            close_on_load=False,  # A splash não fecha automaticamente
+            stay_on_top=True,
+            clickable=False,
+            position="center",
+        )
+
+        # Worker para carregar o conteúdo principal
+        class SplashWorkerThread(QThread):
+            def run(self):
+                # Simula operações de inicialização (ex.: conexão com BD, carregamento de recursos)
+                time.sleep(2)  # Simula um carregamento de 2 segundos
+
+        # Callback após a conclusão do carregamento
+        def finish_callback():
+            window.load_url("http://localhost:5173")
+            window.set_position_by_anchor("center")
+            window.show_and_focus()
+            window.close_splash_screen()
+
+        # Cria e inicia o worker thread
+        splash_worker = SplashWorkerThread()
+        splash_worker.finished.connect(finish_callback)
+        splash_worker.start()
 except Exception as e:
     print(f"Erro ao inicializar a janela principal: {e}")
 
 # Executa o aplicativo Pyloid
 app.run()
+
