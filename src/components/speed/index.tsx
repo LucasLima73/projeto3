@@ -1,5 +1,14 @@
+/* eslint-disable @typescript-eslint/no-unused-vars */
 import { useState } from "react";
-import { Container, Row, Col, Card, Button, Form, Alert } from "react-bootstrap";
+import {
+  Container,
+  Row,
+  Col,
+  Card,
+  Button,
+  Form,
+  Alert,
+} from "react-bootstrap";
 import "./index.css";
 
 const Speed = () => {
@@ -11,8 +20,14 @@ const Speed = () => {
 
   const selectFiles = async () => {
     try {
-      const response = await window.pyloid.CustomAPI.select_files();
-      setSelectedFilesMessage(response.message);
+      const selectedFiles =
+        await window.pyloid.CustomAPI.select_multiple_files();
+      if (selectedFiles.length > 0) {
+        console.log("Arquivos selecionados:", selectedFiles);
+        // Atualize o estado ou a interface conforme necessário
+      } else {
+        console.log("Nenhum arquivo foi selecionado.");
+      }
     } catch (error) {
       console.error("Erro ao selecionar arquivos:", error);
     }
@@ -29,11 +44,16 @@ const Speed = () => {
 
   const processSpedToExcel = async () => {
     if (!excelFileName || !recordNumbers) {
-      setProcessingMessage("O nome do arquivo Excel e os números dos registros são obrigatórios.");
+      setProcessingMessage(
+        "O nome do arquivo Excel e os números dos registros são obrigatórios."
+      );
       return;
     }
     try {
-      const response = await window.pyloid.CustomAPI.process_files(excelFileName, recordNumbers);
+      const response = await window.pyloid.CustomAPI.process_files(
+        excelFileName,
+        recordNumbers
+      );
       setProcessingMessage(response.message);
     } catch (error) {
       console.error("Erro ao processar arquivos SPED para Excel:", error);
@@ -42,18 +62,23 @@ const Speed = () => {
 
   const convertExcelToSped = async () => {
     if (!excelFileName) {
-      setProcessingMessage("Por favor, selecione o arquivo Excel para conversão.");
+      setProcessingMessage(
+        "Por favor, selecione o arquivo Excel para conversão."
+      );
       return;
     }
     try {
       const addName = excelFileName + ".xlsx";
-      const response = await window.pyloid.CustomAPI.convert_excel_to_sped(addName);
+      const response = await window.pyloid.CustomAPI.convert_excel_to_sped(
+        addName
+      );
       setProcessingMessage(response.message);
     } catch (error) {
       console.error("Erro ao converter Excel para SPED:", error);
       setProcessingMessage("Erro ao converter Excel para SPED.");
     }
   };
+  
 
   return (
     <Container className="speed-container">
@@ -61,10 +86,16 @@ const Speed = () => {
         <Col md={8}>
           <Card className="mt-4">
             <Card.Body>
-              <Card.Title className="text-center">Conversor SPED ↔ Excel</Card.Title>
+              <Card.Title className="text-center">
+                Conversor SPED ↔ Excel
+              </Card.Title>
               <hr />
               {processingMessage && (
-                <Alert variant={processingMessage.includes("Erro") ? "danger" : "success"}>
+                <Alert
+                  variant={
+                    processingMessage.includes("Erro") ? "danger" : "success"
+                  }
+                >
                   {processingMessage}
                 </Alert>
               )}
@@ -73,14 +104,18 @@ const Speed = () => {
                   <Button variant="primary" onClick={selectFiles}>
                     Selecionar Arquivos SPED
                   </Button>
-                  {selectedFilesMessage && <Form.Text>{selectedFilesMessage}</Form.Text>}
+                  {selectedFilesMessage && (
+                    <Form.Text>{selectedFilesMessage}</Form.Text>
+                  )}
                 </Form.Group>
 
                 <Form.Group className="mb-3">
                   <Button variant="secondary" onClick={selectDirectory}>
                     Selecionar Diretório de Salvamento
                   </Button>
-                  {selectedDirectoryMessage && <Form.Text>{selectedDirectoryMessage}</Form.Text>}
+                  {selectedDirectoryMessage && (
+                    <Form.Text>{selectedDirectoryMessage}</Form.Text>
+                  )}
                 </Form.Group>
 
                 <Form.Group className="mb-3">
@@ -94,7 +129,9 @@ const Speed = () => {
                 </Form.Group>
 
                 <Form.Group className="mb-3">
-                  <Form.Label>Números dos Registros (separados por vírgula)</Form.Label>
+                  <Form.Label>
+                    Números dos Registros (separados por vírgula)
+                  </Form.Label>
                   <Form.Control
                     type="text"
                     placeholder="Exemplo: 001, 002, 003"

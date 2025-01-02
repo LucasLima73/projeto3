@@ -5,6 +5,7 @@ import xml.etree.ElementTree as ET
 import json
 import base64
 import platform  
+from PySide6.QtWidgets import QFileDialog
 from cryptography.fernet import Fernet
 from typing import Optional, Dict
 
@@ -28,13 +29,34 @@ class CustomAPI(PyloidAPI):
     selected_files = []
     save_directory = ""
 
+    @Bridge(result=list)
+    def select_multiple_files(self):
+        """Abre um diálogo para selecionar múltiplos arquivos."""
+        file_dialog = QFileDialog()
+        file_dialog.setFileMode(QFileDialog.ExistingFiles)
+        file_dialog.setNameFilter("Arquivos TXT (*.txt)")
+        if file_dialog.exec():
+            self.selected_files = file_dialog.selectedFiles()  # Atualiza self.selected_files
+            app.show_notification(
+                title="Arquivos Selecionados",
+                message=f"{len(self.selected_files)} arquivo(s) selecionado(s)."
+            )
+            return self.selected_files
+        app.show_notification(
+            title="Nenhum Arquivo Selecionado",
+            message="Nenhum arquivo foi selecionado."
+        )
+        return []
+
+
     @Bridge(result=str)
     def select_files(self):
         """Seleciona arquivos SPED."""
         try:
             file_paths = app.open_file_dialog(
                 dir=os.getcwd(),
-                filter="Arquivos TXT (*.txt)"
+                filter="Arquivos TXT (*.txt)",
+                multi=True
             )
             if file_paths:
                 self.selected_files = file_paths if isinstance(file_paths, list) else [file_paths]
@@ -143,22 +165,35 @@ class CustomAPI(PyloidAPI):
 
     @Bridge(str, result=str)
     def convert_excel_to_sped(self, excel_file: str):
-        """Converte arquivo Excel para SPED."""
+        """Converte arquivo Excel com múltiplas abas para SPED."""
         try:
             if not self.save_directory:
                 raise ValueError("Nenhum diretório selecionado para salvar o arquivo.")
 
-            # Carrega o arquivo Excel
-            df = pd.read_excel(excel_file, header=None)
+            # Construir o caminho completo do arquivo
+            excel_file_path = os.path.join(self.save_directory, excel_file)
 
-            # Gera as linhas no formato SPED
-            sped_lines = ["|" + "|".join(map(str, row)) + "|" for row in df.values]
+            # Verificar se o arquivo existe
+            if not os.path.isfile(excel_file_path):
+                raise FileNotFoundError(f"Arquivo não encontrado: {excel_file_path}")
 
-            # Salva o resultado no formato SPED
+            # Carregar todas as abas do Excel
+            sheets = pd.read_excel(excel_file_path, sheet_name=None, header=None)
+
+            sped_lines = []
+
+            # Iterar por cada aba e processar os dados
+            for sheet_name, df in sheets.items():
+                for _, row in df.iterrows():
+                    sped_lines.append("|" + "|".join(map(str, row)) + "|")
+
+            # Define o caminho para salvar o arquivo SPED
             save_path = os.path.join(
-                self.save_directory, 
-                os.path.splitext(os.path.basename(excel_file))[0] + ".txt"
+                self.save_directory,
+                os.path.splitext(os.path.basename(excel_file_path))[0] + ".txt"
             )
+
+            # Salvar o resultado no formato SPED
             with open(save_path, "w") as file:
                 file.write("\n".join(sped_lines))
 
@@ -167,6 +202,12 @@ class CustomAPI(PyloidAPI):
                 message=f"Arquivo SPED gerado em: {save_path}",
             )
             return {"success": True, "message": f"Arquivo SPED salvo em: {save_path}"}
+        except FileNotFoundError as e:
+            app.show_notification(
+                title="Erro na Conversão",
+                message=str(e),
+            )
+            return {"success": False, "message": str(e)}
         except Exception as e:
             app.show_notification(
                 title="Erro na Conversão",
@@ -176,7 +217,7 @@ class CustomAPI(PyloidAPI):
 
     @Bridge(str, str, result=str)
     def process_files(self, file_name: str, record_numbers: str):
-        """Processa arquivos SPED com base nos números de registro fornecidos."""
+        """Processa múltiplos arquivos SPED com base nos números de registro fornecidos."""
         try:
             if not self.selected_files:
                 raise ValueError("Nenhum arquivo selecionado para processar.")
@@ -185,6 +226,11 @@ class CustomAPI(PyloidAPI):
             if not file_name:
                 raise ValueError("O nome do arquivo de saída é obrigatório.")
 
+            # Garante que o diretório existe
+            if not os.path.exists(self.save_directory):
+                raise FileNotFoundError(f"Diretório não encontrado: {self.save_directory}")
+
+            # Lista de registros a serem filtrados
             records = [record.strip() for record in record_numbers.split(",") if record.strip()]
             if not records:
                 raise ValueError("Por favor, insira ao menos um número de registro válido.")
@@ -212,27 +258,36 @@ class CustomAPI(PyloidAPI):
             if not dataframes:
                 raise ValueError("Nenhum registro correspondente encontrado.")
 
+            # Define o caminho de salvamento, garantindo que tenha extensão .xlsx
             save_path = os.path.join(
-                self.save_directory, file_name if file_name.endswith(".xlsx") else f"{file_name}.xlsx"
+                self.save_directory,
+                file_name if file_name.endswith(".xlsx") else f"{file_name}.xlsx"
             )
+
+            # Salva os registros no arquivo Excel
             with pd.ExcelWriter(save_path, engine="openpyxl") as writer:
                 for record_type, data in dataframes.items():
-                    max_columns = max(len(row) for row in data)
-                    columns = [f"Campo {i}" for i in range(1, max_columns + 1)]
-                    df = pd.DataFrame(data, columns=columns)
-                    df.to_excel(writer, sheet_name=record_type, index=False)
+                    df = pd.DataFrame(data)
+                    df.to_excel(writer, sheet_name=record_type, index=False, header=False)
 
             app.show_notification(
                 title="Processamento Concluído",
                 message=f"Arquivo salvo em: {save_path}",
             )
             return {"success": True, "message": f"Processo concluído! Arquivo salvo em: {save_path}"}
+        except FileNotFoundError as e:
+            app.show_notification(
+                title="Erro no Diretório",
+                message=str(e),
+            )
+            return {"success": False, "message": str(e)}
         except Exception as e:
             app.show_notification(
                 title="Erro no Processamento",
                 message=f"Erro: {str(e)}",
             )
             return {"success": False, "message": f"Erro no processamento: {e}"}
+
 
     @Bridge(result=bool)
     def is_production(self):
