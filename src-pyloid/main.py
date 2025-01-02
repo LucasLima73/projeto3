@@ -4,7 +4,7 @@ import pandas as pd
 import xml.etree.ElementTree as ET
 import json
 import base64
-import platform  
+import platform
 from PySide6.QtWidgets import QFileDialog
 from cryptography.fernet import Fernet
 from typing import Optional, Dict
@@ -17,12 +17,12 @@ if is_production():
     app.set_tray_icon(os.path.join(get_production_path(), "icons/icon.png"))
     splash_image_path = os.path.join(get_production_path(), "icons/icon.png")
     production_path = get_production_path()
-    
+
 else:
     app.set_icon("src-pyloid/icons/icon.png")
     app.set_tray_icon("src-pyloid/icons/icon.png")
     splash_image_path = "src-pyloid/icons/splash.png"
-  
+
 
 # Classe API Customizada
 class CustomAPI(PyloidAPI):
@@ -47,6 +47,42 @@ class CustomAPI(PyloidAPI):
             message="Nenhum arquivo foi selecionado."
         )
         return []
+    
+    @Bridge(str,result=list)
+    def select_multiple_files_convert(self, file_type: str = "txt"):
+        """
+        Abre um diálogo para selecionar múltiplos arquivos com base no tipo.
+        """
+        try:
+            file_dialog = QFileDialog()
+            file_dialog.setFileMode(QFileDialog.ExistingFiles)
+
+            # Define o filtro com base no tipo do arquivo
+            if file_type == "txt":
+                file_dialog.setNameFilter("Arquivos TXT (*.txt)")
+            elif file_type == "excel":
+                file_dialog.setNameFilter("Arquivos Excel (*.xlsx)")
+
+            if file_dialog.exec():
+                self.selected_files = file_dialog.selectedFiles()
+                app.show_notification(
+                    title="Arquivos Selecionados",
+                    message=f"{len(self.selected_files)} arquivo(s) selecionado(s)."
+                )
+                return self.selected_files
+
+            app.show_notification(
+                title="Nenhum Arquivo Selecionado",
+                message="Nenhum arquivo foi selecionado."
+            )
+            return []
+        except Exception as e:
+            app.show_notification(
+                title="Erro ao Selecionar Arquivos",
+                message=f"Erro: {str(e)}",
+            )
+            return []
+
 
 
     @Bridge(result=str)
@@ -145,7 +181,7 @@ class CustomAPI(PyloidAPI):
 
             # Salva o resultado no formato SPED
             save_path = os.path.join(
-                self.save_directory, 
+                self.save_directory,
                 os.path.splitext(os.path.basename(excel_file))[0] + ".txt"
             )
             with open(save_path, "w") as file:
@@ -215,9 +251,12 @@ class CustomAPI(PyloidAPI):
             )
             return {"success": False, "message": f"Erro na conversão: {e}"}
 
-    @Bridge(str, str, result=str)
-    def process_files(self, file_name: str, record_numbers: str):
-        """Processa múltiplos arquivos SPED com base nos números de registro fornecidos."""
+    @Bridge(str, str, list, bool, result=str)
+    def process_files(self, file_name: str, record_numbers: str, selected_columns: list, relate_c100_c170: bool):
+        """
+        Processa múltiplos arquivos SPED com base nos números de registro fornecidos,
+        nas colunas selecionadas e com a opção de relacionar C100 e C170.
+        """
         try:
             if not self.selected_files:
                 raise ValueError("Nenhum arquivo selecionado para processar.")
@@ -235,10 +274,15 @@ class CustomAPI(PyloidAPI):
             if not records:
                 raise ValueError("Por favor, insira ao menos um número de registro válido.")
 
+            # Prepara um dicionário para armazenar os dados por tipo de registro
             dataframes = {}
+            c100_to_c170 = {}  # Relacionamento C100 e C170
+
             for file_path in self.selected_files:
                 with open(file_path, "r", encoding="latin1") as f:
                     content = f.readlines()
+                    current_c100 = None
+
                     for line in content:
                         line = line.strip()
                         if not line:
@@ -250,6 +294,16 @@ class CustomAPI(PyloidAPI):
                             fields = fields[:-1]
                         if len(fields) > 0:
                             record_type = fields[0]
+
+                            # Lógica para relacionar C100 e C170, se ativada
+                            if relate_c100_c170:
+                                if record_type == "C100":
+                                    current_c100 = tuple(fields)
+                                    if current_c100 not in c100_to_c170:
+                                        c100_to_c170[current_c100] = []
+                                elif record_type == "C170" and current_c100:
+                                    c100_to_c170[current_c100].append(tuple(fields))
+
                             if record_type in records:
                                 if record_type not in dataframes:
                                     dataframes[record_type] = []
@@ -257,6 +311,15 @@ class CustomAPI(PyloidAPI):
 
             if not dataframes:
                 raise ValueError("Nenhum registro correspondente encontrado.")
+
+            # Filtra as colunas selecionadas, se fornecidas
+            for record_type in dataframes:
+                if selected_columns:
+                    selected_columns_indices = [int(column_index) for column_index in selected_columns]
+                    dataframes[record_type] = [
+                        [field for idx, field in enumerate(row) if idx in selected_columns_indices]
+                        for row in dataframes[record_type]
+                    ]
 
             # Define o caminho de salvamento, garantindo que tenha extensão .xlsx
             save_path = os.path.join(
@@ -267,8 +330,20 @@ class CustomAPI(PyloidAPI):
             # Salva os registros no arquivo Excel
             with pd.ExcelWriter(save_path, engine="openpyxl") as writer:
                 for record_type, data in dataframes.items():
-                    df = pd.DataFrame(data)
-                    df.to_excel(writer, sheet_name=record_type, index=False, header=False)
+                    if data:  # Certifique-se de que há conteúdo para salvar
+                        df = pd.DataFrame(data)
+                        df.to_excel(writer, sheet_name=record_type, index=False, header=False)
+
+                # Adiciona aba para o relacionamento C100 e C170, se ativado
+                if relate_c100_c170 and c100_to_c170:
+                    c100_c170_data = []
+                    for c100, c170_list in c100_to_c170.items():
+                        for c170 in c170_list:
+                            c100_c170_data.append(list(c100) + list(c170))
+
+                    if c100_c170_data:
+                        df = pd.DataFrame(c100_c170_data)
+                        df.to_excel(writer, sheet_name="C100_C170", index=False, header=False)
 
             app.show_notification(
                 title="Processamento Concluído",
@@ -289,11 +364,14 @@ class CustomAPI(PyloidAPI):
             return {"success": False, "message": f"Erro no processamento: {e}"}
 
 
+
+
+
     @Bridge(result=bool)
     def is_production(self):
         """Verifica se o ambiente é de produção."""
         return is_production()
-        
+
     @Bridge(result=str)
     def get_production_path(self):
         """Retorna o caminho de produção."""
@@ -302,6 +380,180 @@ class CustomAPI(PyloidAPI):
         except Exception as e:
             print(f"Erro ao obter o caminho de produção: {e}")
             return ""
+    @Bridge(result=dict)
+    def get_columns(self):
+        """Analisa os arquivos selecionados e retorna os números de registro disponíveis."""
+        try:
+            if not self.selected_files:
+                raise ValueError("Nenhum arquivo selecionado para analisar.")
+
+            record_numbers = set()
+            for file_path in self.selected_files:
+                with open(file_path, "r", encoding="latin1") as f:
+                    content = f.readlines()
+                    for line in content:
+                        line = line.strip()
+                        if not line:
+                            continue
+                        fields = line.split("|")
+                        if fields[0] == "":
+                            fields = fields[1:]
+                        if len(fields) > 0:
+                            record_numbers.add(fields[0])
+
+            if not record_numbers:
+                raise ValueError("Nenhum número de registro encontrado nos arquivos.")
+
+            return {"success": True, "recordNumbers": sorted(record_numbers)}
+        except Exception as e:
+            return {"success": False, "message": f"Erro ao identificar números de registro: {e}"}
+    
+    @Bridge(result=dict)
+    def convert_txt_to_excel_bulk(self):
+        """
+        Converte múltiplos arquivos TXT para Excel, criando uma aba para cada registro.
+        """
+        try:
+            if not self.selected_files:
+                raise ValueError("Nenhum arquivo selecionado para conversão.")
+            if not self.save_directory:
+                raise ValueError("Nenhum diretório de salvamento selecionado.")
+
+            # Função para limpar os nomes das abas
+            def sanitize_sheet_name(name):
+                invalid_chars = ['*', '/', '\\', '?', '[', ']', ':']
+                for char in invalid_chars:
+                    name = name.replace(char, "_")  # Substitui caracteres inválidos por "_"
+                return name[:31]  # Limita o nome da aba a 31 caracteres
+
+            for txt_file_path in self.selected_files:
+                try:
+                    # Tenta abrir o arquivo com codificação UTF-8
+                    with open(txt_file_path, "r", encoding="utf-8") as txt_file:
+                        lines = txt_file.readlines()
+                except UnicodeDecodeError:
+                    # Se falhar, tenta abrir com ISO-8859-1
+                    with open(txt_file_path, "r", encoding="latin1") as txt_file:
+                        lines = txt_file.readlines()
+
+                # Dicionário para armazenar os dados organizados por registro
+                records = {}
+
+                # Processa as linhas e organiza por tipo de registro
+                for line in lines:
+                    line = "".join(char if char.isprintable() else " " for char in line)
+                    line = line.strip()
+                    if not line:
+                        continue
+
+                    fields = line.split("|")
+                    if len(fields) > 1:  # Verifica se há pelo menos um registro válido
+                        record_type = fields[1]  # O tipo de registro está no segundo campo (após o delimitador "|")
+                        if record_type not in records:
+                            records[record_type] = []
+                        records[record_type].append(fields)
+
+                # Define o caminho de saída
+                output_file = os.path.join(
+                    self.save_directory,
+                    os.path.splitext(os.path.basename(txt_file_path))[0] + ".xlsx"
+                )
+
+                # Salva os dados em um arquivo Excel com abas separadas
+                with pd.ExcelWriter(output_file, engine="openpyxl") as writer:
+                    for record_type, data in records.items():
+                        if data:
+                            # Sanitiza o nome da aba e limita a 31 caracteres
+                            sheet_name = sanitize_sheet_name(record_type)
+                            df = pd.DataFrame(data)
+                            df.to_excel(writer, sheet_name=sheet_name, index=False, header=False)
+
+            return {"success": True, "message": "Todos os arquivos TXT foram convertidos para Excel com abas por registro."}
+        except Exception as e:
+            return {"success": False, "message": f"Erro ao converter TXT para Excel: {e}"}
+
+
+
+
+
+    @Bridge(result=dict)
+    def convert_excel_to_txt_bulk(self):
+        """
+        Converte múltiplos arquivos Excel para um único arquivo TXT por Excel,
+        preservando zeros à esquerda.
+        """
+        try:
+            if not self.selected_files:
+                raise ValueError("Nenhum arquivo selecionado para conversão.")
+            if not self.save_directory:
+                raise ValueError("Nenhum diretório de salvamento selecionado.")
+
+            for excel_file_path in self.selected_files:
+                # Carregar todas as abas do Excel
+                sheets = pd.read_excel(excel_file_path, sheet_name=None, header=None, dtype=str)
+
+                # Concatenar todas as abas em um único DataFrame
+                combined_df = pd.concat(sheets.values(), ignore_index=True)
+
+                # Substituir valores NaN por strings vazias
+                combined_df.fillna("", inplace=True)
+
+                # Gera linhas no formato TXT
+                lines = []
+                for row in combined_df.values:
+                    # Converte os valores para strings e preserva todos os dados
+                    cleaned_row = list(map(str, row))
+
+                    # Remove campos vazios do final da linha
+                    while cleaned_row and cleaned_row[-1] == "":
+                        cleaned_row.pop()
+
+                    # Adiciona a linha formatada ao resultado
+                    lines.append("|".join(cleaned_row) + "|")
+
+                # Define o caminho de saída
+                output_file = os.path.join(
+                    self.save_directory,
+                    f"{os.path.splitext(os.path.basename(excel_file_path))[0]}.txt"
+                )
+
+                # Salva no formato TXT
+                with open(output_file, "w", encoding="utf-8") as txt_file:
+                    txt_file.write("\n".join(lines))
+
+            return {"success": True, "message": "Todos os arquivos Excel foram convertidos para TXT."}
+        except Exception as e:
+            return {"success": False, "message": f"Erro ao converter Excel para TXT: {e}"}
+
+
+
+        
+    @Bridge(result=str)
+    def select_directory_convert(self):
+        """Seleciona o diretório de salvamento."""
+        try:
+            directory = app.select_directory_dialog(dir=os.getcwd())
+            if directory:
+                self.save_directory = directory
+                app.show_notification(
+                    title="Diretório Selecionado",
+                    message=f"Diretório selecionado: {self.save_directory}",
+                )
+                return self.save_directory
+            app.show_notification(
+                title="Nenhum Diretório Selecionado",
+                message="Nenhum diretório foi selecionado.",
+            )
+            return ""
+        except Exception as e:
+            app.show_notification(
+                title="Erro ao Selecionar Diretório",
+                message=f"Erro: {str(e)}",
+            )
+            return ""
+
+
+
 
 # Classe para Processamento de XML
 class XMLProcessingAPI(PyloidAPI):
@@ -577,7 +829,7 @@ class SpreadsheetProcessingAPI(PyloidAPI):
         window.show_and_focus()
 
         return "Nova janela aberta com sucesso"
-    
+
 class DecodeHash(PyloidAPI):
     @Bridge(str, result=str)
     def decode_base64(self, input: str) -> str:
@@ -592,7 +844,7 @@ class DecodeHash(PyloidAPI):
             return base64.b64decode(input.encode('utf-8')).decode('utf-8')
         except Exception as e:
             raise ValueError(f"Erro ao decodificar Base64: {e}")
-    
+
     @Bridge(str, result=dict)
     def decode_license(self, license: str) -> dict:
         """
@@ -625,16 +877,16 @@ class DecodeHash(PyloidAPI):
         except Exception as e:
             print(f"Erro ao decodificar a licença: {e}")
             return {"success": False, "message": "Licença inválida ou expirada."}
-        
+
 class LicenseStorageAPI(PyloidAPI):
     APP_NAME = "IVFTax"
-    
+
     # Diretório de armazenamento baseado no sistema operacional
     if platform.system() == "Windows":
         BASE_DIR = os.path.join(os.getenv("LOCALAPPDATA"), APP_NAME)
     else:
         BASE_DIR = os.path.expanduser(f"~/.{APP_NAME}")
-    
+
     FILE_PATH = os.path.join(BASE_DIR, "license_data.json")
 
     @staticmethod

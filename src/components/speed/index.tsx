@@ -1,4 +1,3 @@
-/* eslint-disable @typescript-eslint/no-unused-vars */
 import { useState } from "react";
 import {
   Container,
@@ -8,6 +7,7 @@ import {
   Button,
   Form,
   Alert,
+  Spinner,
 } from "react-bootstrap";
 import "./index.css";
 
@@ -15,8 +15,11 @@ const Speed = () => {
   const [selectedFilesMessage, setSelectedFilesMessage] = useState("");
   const [selectedDirectoryMessage, setSelectedDirectoryMessage] = useState("");
   const [excelFileName, setExcelFileName] = useState("");
-  const [recordNumbers, setRecordNumbers] = useState("");
+  const [availableRecords, setAvailableRecords] = useState<string[]>([]);
+  const [selectedRecords, setSelectedRecords] = useState<string[]>([]);
+  const [loadingRecords, setLoadingRecords] = useState(false);
   const [processingMessage, setProcessingMessage] = useState("");
+  const [relateC100C170, setRelateC100C170] = useState(false);
 
   const selectFiles = async () => {
     try {
@@ -24,7 +27,9 @@ const Speed = () => {
         await window.pyloid.CustomAPI.select_multiple_files();
       if (selectedFiles.length > 0) {
         console.log("Arquivos selecionados:", selectedFiles);
-        // Atualize o estado ou a interface conforme necessário
+        setSelectedFilesMessage(
+          `${selectedFiles.length} arquivo(s) selecionado(s).`
+        );
       } else {
         console.log("Nenhum arquivo foi selecionado.");
       }
@@ -42,8 +47,32 @@ const Speed = () => {
     }
   };
 
+  const fetchRecords = async () => {
+    setLoadingRecords(true);
+    try {
+      const response = await window.pyloid.CustomAPI.get_columns();
+      if (response.success) {
+        setAvailableRecords(response.recordNumbers);
+      } else {
+        console.error(response.message);
+      }
+    } catch (error) {
+      console.error("Erro ao buscar números de registro:", error);
+    } finally {
+      setLoadingRecords(false);
+    }
+  };
+
+  const toggleRecordSelection = (record: string) => {
+    setSelectedRecords((prev) =>
+      prev.includes(record)
+        ? prev.filter((r) => r !== record)
+        : [...prev, record]
+    );
+  };
+
   const processSpedToExcel = async () => {
-    if (!excelFileName || !recordNumbers) {
+    if (!excelFileName || selectedRecords.length === 0) {
       setProcessingMessage(
         "O nome do arquivo Excel e os números dos registros são obrigatórios."
       );
@@ -52,7 +81,9 @@ const Speed = () => {
     try {
       const response = await window.pyloid.CustomAPI.process_files(
         excelFileName,
-        recordNumbers
+        selectedRecords.join(","),
+        [],
+        relateC100C170
       );
       setProcessingMessage(response.message);
     } catch (error) {
@@ -78,7 +109,6 @@ const Speed = () => {
       setProcessingMessage("Erro ao converter Excel para SPED.");
     }
   };
-  
 
   return (
     <Container className="speed-container">
@@ -119,6 +149,55 @@ const Speed = () => {
                 </Form.Group>
 
                 <Form.Group className="mb-3">
+                  <Button
+                    variant="info"
+                    onClick={fetchRecords}
+                    disabled={loadingRecords}
+                  >
+                    {loadingRecords ? (
+                      <>
+                        <Spinner
+                          as="span"
+                          animation="border"
+                          size="sm"
+                          role="status"
+                          aria-hidden="true"
+                        />{" "}
+                        Carregando...
+                      </>
+                    ) : (
+                      "Detectar Números de Registro"
+                    )}
+                  </Button>
+                </Form.Group>
+
+                {availableRecords.length > 0 && (
+                  <Form.Group className="mb-3">
+                    <Form.Label>Selecione os Números de Registro</Form.Label>
+                    <div
+                      style={{
+                        maxHeight: "200px",
+                        overflowY: "auto",
+                        border: "1px solid #ddd",
+                        padding: "10px",
+                        borderRadius: "5px",
+                      }}
+                    >
+                      {availableRecords.map((record, index) => (
+                        <Form.Check
+                          key={index}
+                          type="checkbox"
+                          label={`Registro: ${record}`}
+                          value={record}
+                          checked={selectedRecords.includes(record)}
+                          onChange={() => toggleRecordSelection(record)}
+                        />
+                      ))}
+                    </div>
+                  </Form.Group>
+                )}
+
+                <Form.Group className="mb-3">
                   <Form.Label>Nome do Arquivo Excel de Saída</Form.Label>
                   <Form.Control
                     type="text"
@@ -129,14 +208,11 @@ const Speed = () => {
                 </Form.Group>
 
                 <Form.Group className="mb-3">
-                  <Form.Label>
-                    Números dos Registros (separados por vírgula)
-                  </Form.Label>
-                  <Form.Control
-                    type="text"
-                    placeholder="Exemplo: 001, 002, 003"
-                    value={recordNumbers}
-                    onChange={(e) => setRecordNumbers(e.target.value)}
+                  <Form.Check
+                    type="checkbox"
+                    label="Relacionar registros C100 e C170"
+                    checked={relateC100C170}
+                    onChange={(e) => setRelateC100C170(e.target.checked)}
                   />
                 </Form.Group>
 

@@ -13,6 +13,7 @@ import Xml from "./components/xml";
 import Speed from "./components/speed";
 import License from "./components/license";
 import "./App.css";
+import Convert from "./components/convert";
 
 const AppContent = () => {
   const [isLicenseExpired, setIsLicenseExpired] = useState(false);
@@ -96,6 +97,14 @@ const AppContent = () => {
             >
               TXT
             </NavLink>
+            <NavLink
+              to="/convert"
+              className={({ isActive }) =>
+                `sidebar-link ${isActive ? "active" : ""}`
+              }
+            >
+              CONVERSÕES
+            </NavLink>
           </nav>
         </div>
       )}
@@ -106,6 +115,7 @@ const AppContent = () => {
           <Route path="/xls" element={<Xls />} />
           <Route path="/xml" element={<Xml />} />
           <Route path="/speed" element={<Speed />} />
+          <Route path="/convert" element={<Convert />} />
           <Route path="*" element={<Home />} />
         </Routes>
       </div>
