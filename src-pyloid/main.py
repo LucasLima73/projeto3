@@ -8,7 +8,10 @@ import platform
 from PySide6.QtWidgets import QFileDialog
 from cryptography.fernet import Fernet
 from typing import Optional, Dict
+from PySide6.QtCore import QObject, QThread , Signal, Slot
+from concurrent.futures import ThreadPoolExecutor
 
+import traceback
 # Configuração do Pyloid
 app = Pyloid(app_name="IVFTax", single_instance=True)
 
@@ -23,11 +26,80 @@ else:
     app.set_tray_icon("src-pyloid/icons/icon.png")
     splash_image_path = "src-pyloid/icons/splash.png"
 
+executor = ThreadPoolExecutor(max_workers=2)
+class WorkerSignals(QObject):
+    finished = Signal(object)  # Signal for completion (can send data)
+    error = Signal(str)       # Signal for errors
+    progress = Signal(int)     # Signal for progress updates
+    notification = Signal(str, str) #Signal for notifications
 
 # Classe API Customizada
-class CustomAPI(PyloidAPI):
+class CustomAPI(PyloidAPI,QObject):
     selected_files = []
     save_directory = ""
+
+    def __init__(self):
+        super().__init__()
+        self.worker_signals = WorkerSignals()
+        self.worker_signals.finished.connect(self.handle_finished)
+        self.worker_signals.error.connect(self.handle_error)
+        self.worker_signals.notification.connect(self.handle_notification)
+
+    def long_task(self, file_name, record_numbers, selected_columns, relate_c100_c170):
+        try:
+            print("Iniciando long_task...")
+            result = self.process_files(
+                file_name=file_name,
+                record_numbers=record_numbers,
+                selected_columns=selected_columns,
+                relate_c100_c170=relate_c100_c170,
+            )
+            print("Emitindo sinal finished...")
+            self.worker_signals.finished.emit(result)
+
+            if result.get("success"):
+                print("Emitindo notificação de sucesso...")
+                self.worker_signals.notification.emit("Processamento Concluído", result.get("message"))
+                self.worker_signals.finished.emit(result)
+            else:
+                print("Emitindo notificação de erro...")
+                self.worker_signals.notification.emit("Erro no Processamento", result.get("message"))
+        except Exception as e:
+            error_message = traceback.format_exc()
+            print(f"Erro em long_task: {error_message}")
+            self.worker_signals.error.emit(f"Erro durante o processamento: {error_message}")
+            self.worker_signals.notification.emit("Erro no Processamento", f"Erro durante o processamento: {error_message}")
+
+
+
+    @Bridge(str, str, list, bool, result=dict)
+    def process_files_with_thread(self, file_name, record_numbers, selected_columns, relate_c100_c170):
+        """Inicia o processamento em uma thread e conecta os sinais."""
+        if not self.selected_files or not self.save_directory:
+            return {"success": False, "message": "Arquivos ou diretório não selecionados."}
+
+        executor.submit(self.long_task, file_name, record_numbers, selected_columns, relate_c100_c170)
+        return {"success": True, "message": "Processamento iniciado."}
+
+    @Slot(dict)
+    def handle_finished(self, result):
+        if result.get("success"):
+            print("Processo finalizado com sucesso")
+        else:
+            print("Processo finalizado com erro")
+        #Aqui você pode fazer algo com o resultado, como atualizar a UI
+        pass
+
+    @Slot(str)
+    def handle_error(self, message):
+        print(f"Erro: {message}")
+        #Aqui você pode fazer algo com o erro, como mostrar uma mensagem na UI
+        pass
+
+    @Slot(str, str)
+    def handle_notification(self, title, message):
+        app.show_notification(title=title, message=message)
+
 
     @Bridge(result=list)
     def select_multiple_files(self):
@@ -349,19 +421,21 @@ class CustomAPI(PyloidAPI):
                 title="Processamento Concluído",
                 message=f"Arquivo salvo em: {save_path}",
             )
+            
+
             return {"success": True, "message": f"Processo concluído! Arquivo salvo em: {save_path}"}
+            
         except FileNotFoundError as e:
-            app.show_notification(
-                title="Erro no Diretório",
-                message=str(e),
-            )
-            return {"success": False, "message": str(e)}
+            error_message = f"Erro no Diretório: {str(e)}"
+            app.show_notification(title="Erro no Diretório", message=error_message)
+            
+            return {"success": False, "message": error_message}
         except Exception as e:
-            app.show_notification(
-                title="Erro no Processamento",
-                message=f"Erro: {str(e)}",
-            )
-            return {"success": False, "message": f"Erro no processamento: {e}"}
+            error_message = f"Erro no Processamento: {str(e)}"
+            app.show_notification(title="Erro no Processamento", message=error_message)
+            
+            return {"success": False, "message": error_message}
+
 
 
 
@@ -525,6 +599,14 @@ class CustomAPI(PyloidAPI):
         except Exception as e:
             return {"success": False, "message": f"Erro ao converter Excel para TXT: {e}"}
 
+    @Bridge(result=dict)
+    def get_signals(self):
+        """Retorna os sinais disponíveis."""
+        return {
+            "finished": self.worker_signals.finished,
+            "error": self.worker_signals.error,
+            "notification": self.worker_signals.notification,
+        }
 
 
         
@@ -553,6 +635,11 @@ class CustomAPI(PyloidAPI):
             return ""
 
 
+#Na inicialização da sua aplicação
+api_instance = CustomAPI() #Instancia a classe
+api_instance.worker_signals.finished.connect(api_instance.handle_finished)
+api_instance.worker_signals.error.connect(api_instance.handle_error)
+api_instance.worker_signals.notification.connect(api_instance.handle_notification)
 
 
 # Classe para Processamento de XML

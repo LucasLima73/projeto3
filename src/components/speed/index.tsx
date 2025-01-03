@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import {
   Container,
   Row,
@@ -8,6 +8,7 @@ import {
   Form,
   Alert,
   Spinner,
+  ProgressBar,
 } from "react-bootstrap";
 import "./index.css";
 
@@ -19,19 +20,61 @@ const Speed = () => {
   const [selectedRecords, setSelectedRecords] = useState<string[]>([]);
   const [loadingRecords, setLoadingRecords] = useState(false);
   const [processingMessage, setProcessingMessage] = useState("");
-  const [relateC100C170, setRelateC100C170] = useState(false);
+  const [progress, setProgress] = useState(0);
+  const [isProcessing, setIsProcessing] = useState(false);
+  const [activeProcess, setActiveProcess] = useState<
+    "processFiles" | "convertExcelToSped" | null
+  >(null);
+  useEffect(() => {
+    console.log("window.pyloid:", window.pyloid);
+    console.log("window.pyloid?.emitter:", window.pyloid?.emitter);
+
+    if (window.pyloid?.emitter) { // Verificação crucial
+        // ... (adicionar os listeners aqui)
+    } else {
+        console.error("Emitter não está disponível!");
+    }
+
+    // ... (resto do useEffect)
+}, []);
+  useEffect(() => {
+    const handleProgress = (progress) => {
+      setProgress(progress);
+    };
+
+    const handleFinished = (event) => {
+      console.log("Evento Finished Recebido:", event);
+      setProcessingMessage(event.message || "Processo finalizado!");
+      setIsProcessing(false); // Desativa o spinner
+      setActiveProcess(null);
+    };
+
+    const handleError = (event) => {
+      console.error("Evento de Erro:", event);
+      setProcessingMessage(event.message || "Erro no processamento.");
+      setIsProcessing(false);
+      setActiveProcess(null);
+    };
+
+    window.pyloid?.emitter?.on("progress", handleProgress);
+    window.pyloid?.emitter?.on("finished", handleFinished);
+    window.pyloid?.emitter?.on("error", handleError);
+
+    return () => {
+      window.pyloid?.emitter?.off("progress", handleProgress);
+      window.pyloid?.emitter?.off("finished", handleFinished);
+      window.pyloid?.emitter?.off("error", handleError);
+    };
+  }, []);
 
   const selectFiles = async () => {
     try {
       const selectedFiles =
         await window.pyloid.CustomAPI.select_multiple_files();
       if (selectedFiles.length > 0) {
-        console.log("Arquivos selecionados:", selectedFiles);
         setSelectedFilesMessage(
           `${selectedFiles.length} arquivo(s) selecionado(s).`
         );
-      } else {
-        console.log("Nenhum arquivo foi selecionado.");
       }
     } catch (error) {
       console.error("Erro ao selecionar arquivos:", error);
@@ -47,14 +90,14 @@ const Speed = () => {
     }
   };
 
-  const fetchRecords = async () => {
+  const fetchAvailableRecords = async () => {
     setLoadingRecords(true);
     try {
       const response = await window.pyloid.CustomAPI.get_columns();
       if (response.success) {
         setAvailableRecords(response.recordNumbers);
       } else {
-        console.error(response.message);
+        setProcessingMessage(response.message);
       }
     } catch (error) {
       console.error("Erro ao buscar números de registro:", error);
@@ -71,42 +114,72 @@ const Speed = () => {
     );
   };
 
-  const processSpedToExcel = async () => {
+  const toggleSelectAllRecords = () => {
+    if (selectedRecords.length === availableRecords.length) {
+      setSelectedRecords([]);
+    } else {
+      setSelectedRecords(availableRecords);
+    }
+  };
+
+  const processFiles = async () => {
     if (!excelFileName || selectedRecords.length === 0) {
       setProcessingMessage(
         "O nome do arquivo Excel e os números dos registros são obrigatórios."
       );
       return;
     }
+
     try {
-      const response = await window.pyloid.CustomAPI.process_files(
+      setIsProcessing(true);
+      setActiveProcess("processFiles");
+      setProgress(0);
+      setProcessingMessage("");
+      const response = await window.pyloid.CustomAPI.process_files_with_thread(
         excelFileName,
         selectedRecords.join(","),
         [],
-        relateC100C170
+        false // Alterar se necessário
       );
-      setProcessingMessage(response.message);
+
+      if (!response.success) {
+        setProcessingMessage(response.message);
+        setIsProcessing(false);
+        setActiveProcess(null);
+      }
     } catch (error) {
-      console.error("Erro ao processar arquivos SPED para Excel:", error);
+      console.error("Erro ao processar arquivos:", error);
+      setIsProcessing(false);
+      setActiveProcess(null);
     }
   };
 
   const convertExcelToSped = async () => {
     if (!excelFileName) {
       setProcessingMessage(
-        "Por favor, selecione o arquivo Excel para conversão."
+        "Por favor, insira o nome do arquivo Excel para conversão."
       );
       return;
     }
+
     try {
-      const addName = excelFileName + ".xlsx";
+      setIsProcessing(true);
+      setActiveProcess("convertExcelToSped");
+      setProgress(0);
+      setProcessingMessage("");
       const response = await window.pyloid.CustomAPI.convert_excel_to_sped(
-        addName
+        `${excelFileName}.xlsx`
       );
-      setProcessingMessage(response.message);
+
+      if (!response.success) {
+        setProcessingMessage(response.message);
+        setIsProcessing(false);
+        setActiveProcess(null);
+      }
     } catch (error) {
       console.error("Erro ao converter Excel para SPED:", error);
-      setProcessingMessage("Erro ao converter Excel para SPED.");
+      setIsProcessing(false);
+      setActiveProcess(null);
     }
   };
 
@@ -151,7 +224,7 @@ const Speed = () => {
                 <Form.Group className="mb-3">
                   <Button
                     variant="info"
-                    onClick={fetchRecords}
+                    onClick={fetchAvailableRecords}
                     disabled={loadingRecords}
                   >
                     {loadingRecords ? (
@@ -163,17 +236,26 @@ const Speed = () => {
                           role="status"
                           aria-hidden="true"
                         />{" "}
-                        Carregando...
+                        Carregando Registros...
                       </>
                     ) : (
-                      "Detectar Números de Registro"
+                      "Carregar Registros"
                     )}
                   </Button>
                 </Form.Group>
 
                 {availableRecords.length > 0 && (
                   <Form.Group className="mb-3">
-                    <Form.Label>Selecione os Números de Registro</Form.Label>
+                    <Form.Label>
+                      <Form.Check
+                        type="checkbox"
+                        label="Selecionar Todos"
+                        checked={
+                          selectedRecords.length === availableRecords.length
+                        }
+                        onChange={toggleSelectAllRecords}
+                      />
+                    </Form.Label>
                     <div
                       style={{
                         maxHeight: "200px",
@@ -207,26 +289,53 @@ const Speed = () => {
                   />
                 </Form.Group>
 
-                <Form.Group className="mb-3">
-                  <Form.Check
-                    type="checkbox"
-                    label="Relacionar registros C100 e C170"
-                    checked={relateC100C170}
-                    onChange={(e) => setRelateC100C170(e.target.checked)}
-                  />
-                </Form.Group>
-
                 <div className="d-grid gap-2 mb-3">
-                  <Button variant="success" onClick={processSpedToExcel}>
-                    Converter SPED para Excel
+                  <Button
+                    variant="success"
+                    onClick={processFiles}
+                    disabled={
+                      isProcessing || activeProcess === "convertExcelToSped"
+                    }
+                  >
+                    {isProcessing && activeProcess === "processFiles" ? (
+                      <Spinner
+                        as="span"
+                        animation="border"
+                        size="sm"
+                        role="status"
+                        aria-hidden="true"
+                      />
+                    ) : (
+                      "Processar Arquivos"
+                    )}
                   </Button>
                 </div>
 
                 <div className="d-grid">
-                  <Button variant="warning" onClick={convertExcelToSped}>
-                    Converter Excel para SPED
+                  <Button
+                    variant="warning"
+                    onClick={convertExcelToSped}
+                    disabled={isProcessing || activeProcess === "processFiles"}
+                  >
+                    {activeProcess === "convertExcelToSped" ? (
+                      <Spinner
+                        as="span"
+                        animation="border"
+                        size="sm"
+                        role="status"
+                        aria-hidden="true"
+                      />
+                    ) : (
+                      "Converter Excel para SPED"
+                    )}
                   </Button>
                 </div>
+
+                {isProcessing && (
+                  <div className="mt-3">
+                    <ProgressBar now={progress} label={`${progress}%`} />
+                  </div>
+                )}
               </Form>
             </Card.Body>
           </Card>
